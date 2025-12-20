@@ -1,4 +1,4 @@
-export default function Repo({ repos = [] }) {
+function Repo({ repos = [] }) {
     const items = Array.isArray(repos) ? repos : [];
     return (
         <div className="p-4" width="match_parent" height="wrap_content">
@@ -22,3 +22,5 @@ export default function Repo({ repos = [] }) {
         </div>
     );
 }
+
+module.exports = Repo;

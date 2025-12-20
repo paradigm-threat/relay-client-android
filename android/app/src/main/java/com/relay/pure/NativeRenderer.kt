@@ -60,6 +60,7 @@ object NativeRenderer {
 
         val view = when (type.lowercase()) {
             "div", "view" -> LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+            "frame" -> FrameLayout(ctx)
             "text", "span" -> TextView(ctx)
             "button" -> Button(ctx)
             "img", "image" -> ImageView(ctx)
@@ -152,6 +153,11 @@ object NativeRenderer {
             val lp = (child.layoutParams as? LinearLayout.LayoutParams)
                 ?: LinearLayout.LayoutParams(child.layoutParams)
             child.layoutParams = lp
+        }
+
+        if (parent is ScrollView && parent.childCount > 0) {
+            Log.w(TAG, "ScrollView already has a child! Only one direct child is allowed. Consider wrapping children in a <view> or <div>.")
+            return
         }
 
         if (index >= 0 && parent is ViewGroup) {

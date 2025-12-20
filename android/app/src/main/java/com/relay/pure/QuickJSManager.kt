@@ -32,7 +32,8 @@ class QuickJSManager(private val context: Context) {
     private val prefs = context.getSharedPreferences("runtime_pref", Context.MODE_PRIVATE)
     private var quickJs: QuickJs? = null
     private var runtimeMode: RuntimeMode = loadRuntimePreference()
-    private var lastAsset: String? = "home.jsx"
+    private var lastAsset: String? = "settings.jsx"
+    private var lastProps: Map<String, Any> = emptyMap()
     var userMessageHandler: ((String, Boolean) -> Unit)? = null
     var runtimeChangedHandler: ((RuntimeMode) -> Unit)? = null
 
@@ -50,8 +51,8 @@ class QuickJSManager(private val context: Context) {
         prefs.edit().putString("mode", mode.mode).apply()
         emitUserMessage("Switching to ${mode.mode} runtime...")
         resetEngine()
-        val assetToRender = lastAsset ?: "home.jsx"
-        renderHook(assetToRender)
+        val assetToRender = lastAsset ?: "settings.jsx"
+        renderHook(assetToRender, lastProps)
     }
 
     fun currentRuntime(): RuntimeMode = runtimeMode
@@ -69,6 +70,7 @@ class QuickJSManager(private val context: Context) {
             installRenderer(engine)
             NativeRenderer.setQuickJsEngine(engine)
             loadRuntime(engine)
+            // loadSharedComponents(engine) // Disabled - HookRenderer.jsx uses ES6 import/export
             injectVersions(engine)
             injectRepos(engine)
             runtimeChangedHandler?.invoke(runtimeMode)
@@ -77,9 +79,23 @@ class QuickJSManager(private val context: Context) {
         }
     }
 
+    private fun loadSharedComponents(engine: QuickJs) {
+        // Load HookRenderer so it's available globally for other hooks
+        try {
+            val source = readAssetFile("HookRenderer.jsx")
+            if (source.isNotEmpty()) {
+                val transpiled = RustTranspilerModule.transpile(source, "HookRenderer.jsx")
+                engine.evaluate(transpiled, "HookRenderer.jsx")
+                Log.i(TAG, "Loaded HookRenderer shared component")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load shared components", e)
+        }
+    }
+
     private fun loadRuntimePreference(): RuntimeMode {
-        val stored = prefs.getString("mode", RuntimeMode.REACT.mode)
-        return RuntimeMode.fromString(stored) ?: RuntimeMode.REACT
+        val stored = prefs.getString("mode", RuntimeMode.ACT.mode)
+        return RuntimeMode.fromString(stored) ?: RuntimeMode.ACT
     }
 
     private fun emitUserMessage(message: String, isError: Boolean = false) {
@@ -134,6 +150,7 @@ class QuickJSManager(private val context: Context) {
 
     fun renderHook(asset: String, props: Map<String, Any> = emptyMap()) {
         lastAsset = asset
+        lastProps = props
         val engine = quickJs ?: run {
             Log.w(TAG, "QuickJS not initialized")
             emitUserMessage("Engine is not ready yet. Try switching tabs or restarting.", true)
@@ -164,7 +181,9 @@ class QuickJSManager(private val context: Context) {
         Log.d(TAG, "Transpiled $asset preview: ${transpiled.take(400)}")
 
         try {
-            engine.evaluate(transpiled, asset)
+            // Wrap transpiled code to capture module.exports
+            val wrappedCode = "(function() { $transpiled; globalThis.__last_module__ = { default: module.exports }; })();"
+            engine.evaluate(wrappedCode, asset)
             val renderScript = when (runtimeMode) {
                 RuntimeMode.ACT -> """
                     (function(){
@@ -237,7 +256,42 @@ class QuickJSManager(private val context: Context) {
             globalThis.__nativeSetRuntime = function(mode) {
                 __pushMessage('setRuntime', { mode: mode });
             };
-                globalThis.__nativeAddEventListener = function(tag, eventName) {
+            globalThis.__nativeOpenRepo = function(url) {
+                var label = url.replace('http://', '').replace('https://', '');
+                __pushMessage('addTab', { label: label, asset: 'repo.jsx', props: { host: url } });
+            };
+            
+            globalThis.fetch = function(url, options) {
+                return new Promise((resolve, reject) => {
+                    const id = Math.random().toString(36).substring(7);
+                    globalThis.__pendingFetches = globalThis.__pendingFetches || {};
+                    globalThis.__pendingFetches[id] = { resolve, reject };
+                    __pushMessage('fetch', { url: url, options: options, id: id });
+                });
+            };
+
+            globalThis.__resolveFetch = function(id, ok, status, text) {
+                const p = globalThis.__pendingFetches && globalThis.__pendingFetches[id];
+                if (p) {
+                    delete globalThis.__pendingFetches[id];
+                    p.resolve({
+                        ok: ok,
+                        status: status,
+                        text: function() { return Promise.resolve(text); },
+                        json: function() { return Promise.resolve(JSON.parse(text)); }
+                    });
+                }
+            };
+
+            globalThis.__resolveTranspile = function(id, result) {
+                const p = globalThis.__pendingTranspiles && globalThis.__pendingTranspiles[id];
+                if (p) {
+                    delete globalThis.__pendingTranspiles[id];
+                    p.resolve(result);
+                }
+            };
+
+            globalThis.__nativeAddEventListener = function(tag, eventName) {
                     __pushMessage('addEventListener', { tag: tag, eventName: eventName });
                 };
                 globalThis.__nativeRemoveEventListener = function(tag, eventName) {
@@ -260,9 +314,9 @@ class QuickJSManager(private val context: Context) {
             return
         }
         
-        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val listType = object : TypeToken<List<Map<String, Any>>>() {}.type
         val messages: List<Map<String, Any>> = try {
-            gson.fromJson(queueJson, type)
+            gson.fromJson(queueJson, listType)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse message queue: $queueJson", e)
             return
@@ -309,9 +363,9 @@ class QuickJSManager(private val context: Context) {
                     "addChild" -> {
                         val parent = (payload["parent"] as? Double)?.toInt() ?: return@post
                         val child = (payload["child"] as? Double)?.toInt() ?: return@post
-                        val index = (payload["index"] as? Double)?.toInt() ?: -1
-                        Log.d(TAG, "addChild: parent=$parent, child=$child, index=$index")
-                        NativeBridge.addChild(parent, child, index)
+                        val childIndex = (payload["index"] as? Double)?.toInt() ?: -1
+                        Log.d(TAG, "addChild: parent=$parent, child=$child, index=$childIndex")
+                        NativeBridge.addChild(parent, child, childIndex)
                     }
                     "removeChild" -> {
                         val parent = (payload["parent"] as? Double)?.toInt() ?: return@post
@@ -329,7 +383,57 @@ class QuickJSManager(private val context: Context) {
                             emitUserMessage("Unknown runtime request", true)
                         }
                     }
-                        "addEventListener" -> {
+                    "addTab" -> {
+                        val label = payload["label"] as? String ?: "Tab"
+                        val asset = payload["asset"] as? String ?: "repo.jsx"
+                        @Suppress("UNCHECKED_CAST")
+                        val props = payload["props"] as? Map<String, Any> ?: emptyMap()
+                        mainHandler.post {
+                            (context as? MainActivity)?.addTab(label, asset, props)
+                        }
+                    }
+                    "fetch" -> {
+                        val urlString = payload["url"] as? String ?: return@post
+                        val id = payload["id"] as? String ?: return@post
+                        Thread {
+                            try {
+                                val url = java.net.URL(urlString)
+                                val connection = url.openConnection() as java.net.HttpURLConnection
+                                connection.requestMethod = "GET"
+                                connection.connectTimeout = 5000
+                                connection.readTimeout = 5000
+                                val text = try {
+                                    connection.inputStream.bufferedReader().use { it.readText() }
+                                } catch (e: Exception) {
+                                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                                }
+                                val status = connection.responseCode
+                                val ok = status in 200..299
+                                mainHandler.post {
+                                    val textJson = gson.toJson(text)
+                                    engine.evaluate("globalThis.__resolveFetch('$id', $ok, $status, $textJson)", "resolve_fetch")
+                                }
+                            } catch (e: Exception) {
+                                mainHandler.post {
+                                    val errorJson = gson.toJson(e.message ?: "Unknown error")
+                                    engine.evaluate("globalThis.__resolveFetch('$id', false, 500, $errorJson)", "resolve_fetch_error")
+                                }
+                            }
+                        }.start()
+                    }
+                    "transpile" -> {
+                        val code = payload["code"] as? String ?: return@post
+                        val filename = payload["filename"] as? String ?: "unknown.jsx"
+                        val id = payload["id"] as? String ?: return@post
+                        val result = try {
+                            RustTranspilerModule.transpile(code, filename)
+                        } catch (e: Exception) {
+                            "// Transpile error: ${e.message}"
+                        }
+                        val resultJson = gson.toJson(result)
+                        engine.evaluate("globalThis.__resolveTranspile('$id', $resultJson)", "resolve_transpile")
+                    }
+                    "addEventListener" -> {
                             val tag = (payload["tag"] as? Double)?.toInt() ?: return@post
                             val eventName = payload["eventName"] as? String ?: return@post
                             Log.d(TAG, "addEventListener: tag=$tag, eventName=$eventName")
@@ -383,6 +487,14 @@ class QuickJSManager(private val context: Context) {
         engine.evaluate(
             """
             globalThis.nativeBridge = {
+              transpile: function(code, filename) {
+                return new Promise((resolve, reject) => {
+                  const id = Math.random().toString(36).substring(7);
+                  globalThis.__pendingTranspiles = globalThis.__pendingTranspiles || {};
+                  globalThis.__pendingTranspiles[id] = { resolve, reject };
+                  globalThis.__pushMessage('transpile', { code: code, filename: filename, id: id });
+                });
+              },
               createView: function(tag, type, props) {
                 globalThis.__nativeCreateView(tag, type, JSON.stringify(props || {}));
               },

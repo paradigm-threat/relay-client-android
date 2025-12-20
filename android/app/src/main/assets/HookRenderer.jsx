@@ -18,15 +18,18 @@ export const HookRenderer = ({ host, hookPath = '/hooks/client/get-client.jsx' }
         
         const transpiled = await nativeBridge.transpile(code, hookPath);
         
-        // Simplified execution for the demo/plan
-        // In a real app, this would use the HookLoader from hook-transpiler
-        const module = { exports: {} };
-        const fn = new Function('React', 'module', 'exports', transpiled);
-        fn(React, module, module.exports);
+        // Executing transpiled code which includes its own CommonJS wrapper
+        // and sets globalThis.__last_module__
+        const fn = new Function('React', transpiled);
+        fn(React);
         
         if (mounted) {
-          const HookComponent = module.exports.default;
-          setElement(<HookComponent />);
+          const HookComponent = (globalThis.__last_module__ && globalThis.__last_module__.default);
+          if (HookComponent) {
+            setElement(<HookComponent />);
+          } else {
+            setError("Hook did not export a default component");
+          }
           setLoading(false);
         }
       } catch (err) {
@@ -45,3 +48,5 @@ export const HookRenderer = ({ host, hookPath = '/hooks/client/get-client.jsx' }
   if (error) return <div className="p-4 bg-red-50"><span className="text-red-800">Error: {error}</span></div>;
   return element;
 };
+
+globalThis.HookRenderer = HookRenderer;

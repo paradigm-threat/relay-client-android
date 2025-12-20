@@ -1,4 +1,4 @@
-export default function Home() {
+function Home() {
     const versions = globalThis.__versions || {};
     const tVer = versions.transpiler || 'unknown';
     const sVer = versions.styler || 'unknown';
@@ -27,3 +27,5 @@ export default function Home() {
         </div>
     );
 }
+
+module.exports = Home;

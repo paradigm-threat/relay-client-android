@@ -11,9 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
     private lateinit var jsContainer: FrameLayout
-    private lateinit var tabHome: Button
-    private lateinit var tabRepos: Button
-    private lateinit var tabSettings: Button
+    private lateinit var tabContainer: LinearLayout
     private lateinit var runtimeLabel: TextView
     private lateinit var runtimeReactBtn: Button
     private lateinit var runtimeActBtn: Button
@@ -28,42 +26,31 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Color.BLACK)
         }
 
-        val tabBar = LinearLayout(this).apply {
+        val scrollTabBar = android.widget.HorizontalScrollView(this).apply {
+            setBackgroundColor(Color.rgb(34, 34, 34))
+        }
+
+        tabContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        scrollTabBar.addView(tabContainer)
+
+        // Add default tabs
+        addTab("Home", "home.jsx")
+        addTab("Repos", "repo.jsx")
+        addTab("Settings", "settings.jsx")
+
+        // Right-aligned runtime selector group
+        val bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.rgb(34, 34, 34))
         }
 
-        tabHome = Button(this).apply {
-            text = "Home"
-            setOnClickListener { renderHook("home.jsx") }
-        }
-        tabRepos = Button(this).apply {
-            text = "Repos"
-            setOnClickListener { renderHook("repo.jsx") }
-        }
-        tabSettings = Button(this).apply {
-            text = "Settings"
-            setOnClickListener { renderHook("settings.jsx") }
-        }
-        // Left tabs
-        tabBar.addView(tabHome)
-        tabBar.addView(tabRepos)
-        tabBar.addView(tabSettings)
-
-        // Spacer to push following views to the right
-        val spacer = TextView(this).apply { text = "" }
-        spacer.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        tabBar.addView(spacer)
-
-        // Right-aligned runtime selector group
-        val rightGroup = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
         runtimeLabel = TextView(this).apply {
             text = "Runtime: --"
             textSize = 14f
             setTextColor(Color.WHITE)
-            setPadding(8, 8, 8, 8)
+            setPadding(16, 16, 16, 16)
         }
         runtimeReactBtn = Button(this).apply {
             text = "React"
@@ -75,10 +62,9 @@ class MainActivity : AppCompatActivity() {
             textSize = 12f
             setOnClickListener { quickJSManager?.setRuntimeMode(RuntimeMode.ACT) }
         }
-        rightGroup.addView(runtimeLabel)
-        rightGroup.addView(runtimeReactBtn)
-        rightGroup.addView(runtimeActBtn)
-        tabBar.addView(rightGroup)
+        bottomBar.addView(runtimeLabel)
+        bottomBar.addView(runtimeReactBtn)
+        bottomBar.addView(runtimeActBtn)
 
         jsContainer = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -89,11 +75,12 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        rootLayout.addView(tabBar, LinearLayout.LayoutParams(
+        rootLayout.addView(scrollTabBar, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
         rootLayout.addView(jsContainer)
+        rootLayout.addView(bottomBar)
 
         setContentView(rootLayout)
 
@@ -113,6 +100,14 @@ class MainActivity : AppCompatActivity() {
             Log.e("MainActivity", "QuickJS init failed", e)
             showError("Failed to initialize QuickJS: ${e.message}")
         }
+    }
+
+    fun addTab(label: String, asset: String, props: Map<String, Any> = emptyMap()) {
+        val tabButton = Button(this).apply {
+            text = label
+            setOnClickListener { renderHook(asset, props) }
+        }
+        tabContainer.addView(tabButton)
     }
 
     private fun addStatus(message: String) {
@@ -147,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun renderHook(asset: String) {
-        quickJSManager?.renderHook(asset)
+    private fun renderHook(asset: String, props: Map<String, Any> = emptyMap()) {
+        quickJSManager?.renderHook(asset, props)
     }
 }

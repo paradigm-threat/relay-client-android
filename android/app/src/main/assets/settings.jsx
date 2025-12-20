@@ -1,4 +1,4 @@
-export default function Settings() {
+function Settings() {
     const runtime = (globalThis.__runtime && globalThis.__runtime.mode) || 'react';
 
     const setRuntime = (mode) => {
@@ -43,3 +43,5 @@ export default function Settings() {
         </div>
     );
 }
+
+module.exports = Settings;
