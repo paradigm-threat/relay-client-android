@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "client-core",
+    "android-jni",
+]
+resolver = "2"

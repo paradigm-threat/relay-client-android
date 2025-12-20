@@ -1,0 +1,400 @@
+12-20 11:40:52.288   940   940 I wpa_supplicant: nl80211: Drv Event 60 (NL80211_CMD_FRAME_TX_STATUS) received for wlan0
+12-20 11:40:52.496   459   459 I thermal_repeater: socket -1
+12-20 11:40:54.292   940   940 I wpa_supplicant: wlan0: GAS-QUERY-DONE addr=e99870e26678a6c9c dialog_token=253 freq=5220 status_code=0 result=TIMEOUT
+12-20 11:40:54.292   940   940 I wpa_supplicant: wlan0: ANQP-QUERY-DONE addr=e99870e26678a6c9c result=FAILURE
+12-20 11:40:54.336   940   940 I wpa_supplicant: nl80211: Drv Event 55 (NL80211_CMD_REMAIN_ON_CHANNEL) received for wlan0
+12-20 11:40:54.433   940   940 I wpa_supplicant: nl80211: Drv Event 60 (NL80211_CMD_FRAME_TX_STATUS) received for wlan0
+12-20 11:40:56.436   940   940 I wpa_supplicant: wlan0: GAS-QUERY-DONE addr=7f3d03aea4b3fe98d dialog_token=254 freq=5220 status_code=0 result=TIMEOUT
+12-20 11:40:56.436   940   940 I wpa_supplicant: wlan0: ANQP-QUERY-DONE addr=7f3d03aea4b3fe98d result=FAILURE
+12-20 11:40:57.497   459   459 I thermal_repeater: socket -1
+12-20 11:40:58.861   463   463 I thermal_src: recvmsg_expect 2, but get 6 
+12-20 11:40:58.861   463   463 V thermal_src: waiting NOTIFY from kernel miss, -1
+12-20 11:41:02.227 16149 16149 I main.wifi_log_levels: wifi_log_levels:rssi=-35;noise=-79;channel=157;txframes=151661;txretries=6682;txper=Tx retry count = 6682;txnoack=0;txplr=Tx fail to Rcv ACK after retry = 0;rxframes=1478652;rxcrc=586538;rxper=Rx with CRC = 586538;rxdrop=15463;rxdup=0;falsecca=False CCA(total) =;onesecfalsecca=False CCA(one-second) =;phymode=802.11ac;phyrate=;lasttxrate=433000000;lastrxrate=6000000;abnormal_int=0;soft_int=0;tx_int=0;rxdata_int=0;rxevent_int=0;rxmgmt_int=0;rxother_int=0;
+12-20 11:41:02.239 16150 16150 I main.wifi_log_levels: wifi_log_levels:max_rssi=-19;min_rssi=-50;max_noise=-62;min_noise=-95;
+12-20 11:41:02.497   459   459 I thermal_repeater: socket -1
+12-20 11:41:07.498   459   459 I thermal_repeater: socket -1
+12-20 11:41:08.884   463   463 I thermal_src: recvmsg_expect 4, but get 5 
+12-20 11:41:08.884   463   463 V thermal_src: TA_DAEMON_CMD_SET_TTJ:ERROR ret=-1
+12-20 11:41:08.884   463   463 E thermal_src: set_ttj_to_kernel 1:error -1
+12-20 11:41:08.884   463   463 I thermal_src: recvmsg_expect 6, but get 4 
+12-20 11:41:08.884   463   463 V thermal_src: TA_DAEMON_CMD_GET_TI:ERROR ret=-1
+12-20 11:41:08.884   463   463 I thermal_src: recvmsg_expect 2, but get 6 
+12-20 11:41:08.884   463   463 V thermal_src: waiting NOTIFY from kernel miss, -1
+12-20 11:41:12.498   459   459 I thermal_repeater: socket -1
+12-20 11:41:13.876   635   728 I chatty  : uid=1000(system) WifiStateMachin expire 1 line
+12-20 11:41:15.302   635   652 I ActivityManager: Force stopping com.relay.pure appid=10264 user=-1: installPackageLI
+12-20 11:41:15.302   635   652 I ActivityManager: Killing 15243:com.relay.pure/u0a264 (adj 0): stop com.relay.pure
+12-20 11:41:15.304   635   652 W ActivityManager: Force removing ActivityRecord{15b544a u0 com.relay.pure/.MainActivity t1548}: app died, no saved state
+12-20 11:41:15.349   348   348 I Zygote  : Process 15243 exited due to signal (9)
+12-20 11:41:15.427   635   666 I PackageManager: Update package com.relay.pure code path from /data/app/com.relay.pure-EyKc0SXY-MJUd8_5UFWT2w== to /data/app/com.relay.pure-t01ygt622axfcoQlnxK2AQ==; Retain data and using new
+12-20 11:41:15.427   635   666 I PackageManager: Update package com.relay.pure resource path from /data/app/com.relay.pure-EyKc0SXY-MJUd8_5UFWT2w== to /data/app/com.relay.pure-t01ygt622axfcoQlnxK2AQ==; Retain data and using new
+12-20 11:41:15.431   635   652 I chatty  : uid=1000(system) ActivityManager expire 1 line
+12-20 11:41:15.443   635   653 W Looper  : Slow dispatch took 141ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=null m=53
+12-20 11:41:15.444   635   666 I chatty  : uid=1000(system) PackageManager expire 133 lines
+12-20 11:41:15.531   635   666 E SELinux : avc:  denied  { grant } for  scontext=u:r:amazon_app:s0 tcontext=u:r:system_server:s0 tclass=serendipity_perms permissive=0
+12-20 11:41:15.547   635   666 E SELinux : avc:  denied  { grant_amazon_permissions } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=amazon_policies permissive=0
+12-20 11:41:15.547   635   666 E SELinux : avc:  denied  { grant } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=serendipity_perms permissive=0
+12-20 11:41:15.547   635   666 E SELinux : avc:  denied  { grant_amazon_permissions } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=amazon_policies permissive=0
+12-20 11:41:15.547   635   666 E SELinux : avc:  denied  { grant_amazon_permissions } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=amazon_policies permissive=0
+12-20 11:41:15.549   635   666 E SELinux : avc:  denied  { grant } for  scontext=u:r:amazon_app:s0 tcontext=u:r:system_server:s0 tclass=serendipity_perms permissive=0
+12-20 11:41:15.639   635   635 W Looper  : Slow dispatch took 198ms main h=com.android.server.job.JobSchedulerService$JobHandler c=null m=7
+12-20 11:41:15.641   635   666 E SELinux : avc:  denied  { grant } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=serendipity_perms permissive=0
+12-20 11:41:15.642   635   666 W CleanUpDalvikCache: null object found, returning
+12-20 11:41:15.642   635   666 I AmzPkgMgrCallback: Deferring resource clean-up
+12-20 11:41:15.642   433 31533 E         : Couldn't opendir /data/app/vmdl1623386809.tmp: No such file or directory
+12-20 11:41:15.642   433 31533 E installd: Failed to delete /data/app/vmdl1623386809.tmp: No such file or directory
+12-20 11:41:15.643   635   666 I com.android.server.pm.ExternalInstallPackageManagerCallback: Installation succeeded for app com.relay.pure on internal storage. Return code:1
+12-20 11:41:15.648   635   666 I ActivityManager: Force stopping com.relay.pure appid=10264 user=0: pkg removed
+12-20 11:41:15.650   635   772 E SELinux : avc:  denied  { log_internal_metric } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=amazon_policies permissive=0
+12-20 11:41:15.663   635   772 W AmazonProfileService: Active profile for the package xxx not present for customer Id xxx
+12-20 11:41:15.666  1479  1479 I SALE_SaleService: PackageStatusReceiver onReceive
+12-20 11:41:15.668  1479  2937 I SALE_SaleService: PackageStatusReceiver: package removed : com.relay.pure isReplacing : true
+12-20 11:41:15.669   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.amazon.diode/.analyzer.PackageEventReceiver
+12-20 11:41:15.675   635   653 W Looper  : Slow dispatch took 232ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=null m=31
+12-20 11:41:15.675   635   653 W Looper  : Slow delivery took 240ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=null m=30
+12-20 11:41:15.676   635   653 W Looper  : Drained
+12-20 11:41:15.680  9290  9290 I Finsky  : [2] ahmo - Received: android.intent.action.PACKAGE_REMOVED, [m-IzUI3Ppiii2emxMknHt6uFica8dyvx3CiYpkno5lM]
+12-20 11:41:15.681  1312  1312 I SPCH-SIM_PackageChangedReceiver: Intent action: android.intent.action.PACKAGE_REMOVED
+12-20 11:41:15.681  1312  1312 I SPCH-SIM_BroadcastPackageChangedListener: Broadcasting package removed
+12-20 11:41:15.685 15355 15355 I Finsky:background: [2] ahme - Received: android.intent.action.PACKAGE_REMOVED, [m-IzUI3Ppiii2emxMknHt6uFica8dyvx3CiYpkno5lM]
+12-20 11:41:15.688 20222 20222 D com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver.PII: LWA onReceive : action=android.intent.action.PACKAGE_REMOVED, isReplacing= true data=:<obscured>
+12-20 11:41:15.688  1479  1479 I SALE_SaleService: PackageStatusReceiver onReceive
+12-20 11:41:15.688 20222 20222 I com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver: LWA onRecieve : Package is being replaced, will leave this to ACTION_PACKAGE_REPLACED receiver
+12-20 11:41:15.696  9290  9290 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.relay.pure]
+12-20 11:41:15.697  9290  9290 I Finsky  : [2] AIM: AppInfoManager-Perf > getApps > called for 1 apps
+12-20 11:41:15.698  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.relay.pure]
+12-20 11:41:15.698   635   660 W ActivityManager: setHasOverlayUi called on unknown pid: 15243
+12-20 11:41:15.701 18927 18946 I ContentSyncFramework: Got Intent android.intent.action.PACKAGE_REPLACED
+12-20 11:41:15.702   635   660 E AmazonProfileService: Active profile has not been set
+12-20 11:41:15.704   635 24592 V IntentResolver: Resolving type=null scheme=null defaultOnly=false userId=0 of Intent { act=com.amazon.whisperlink.actview.ui.SELECTION flg=0x8 }
+12-20 11:41:15.704   635 24592 V IntentResolver: Action list: null
+12-20 11:41:15.704   635 24592 V IntentResolver: Final result list:
+12-20 11:41:15.704   373   620 D AudioALSAHardware: +setParameters(): continuous_audio_mode=0
+12-20 11:41:15.704   373   620 W AudioALSAHardware: setParameters(), still have param.size() = 1, remain param = "continuous_audio_mode=0"
+12-20 11:41:15.704   373   620 D AudioALSAHardware: -setParameters(): continuous_audio_mode=0 
+12-20 11:41:15.707   635 22909 V IntentResolver: Resolving type=null scheme=null defaultOnly=false userId=0 of Intent { act=com.amazon.whisperlink.actview.ui.SELECTION flg=0x8 }
+12-20 11:41:15.707   635 22909 V IntentResolver: Action list: null
+12-20 11:41:15.707   635 22909 V IntentResolver: Final result list:
+12-20 11:41:15.707   635   946 E ActivityManager: Sending non-protected broadcast com.amazon.alexa.android.intent.action.PACKAGE_REMOVED from system 1312:amazon.speech.sim/u0a7 pkg com.amazon.media.session.monitor
+12-20 11:41:15.707   635   946 E ActivityManager: java.lang.Throwable
+12-20 11:41:15.707   635   946 E ActivityManager: 	at com.android.server.am.ActivityManagerService.checkBroadcastFromSystem(ActivityManagerService.java:21473)
+12-20 11:41:15.707   635   946 E ActivityManager: 	at com.android.server.am.ActivityManagerService.broadcastIntentLocked(ActivityManagerService.java:22082)
+12-20 11:41:15.707   635   946 E ActivityManager: 	at com.android.server.am.ActivityManagerService.broadcastIntent(ActivityManagerService.java:22224)
+12-20 11:41:15.707   635   946 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact$broadcastIntent$(IActivityManager.java:10172)
+12-20 11:41:15.707   635   946 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact(IActivityManager.java:167)
+12-20 11:41:15.707   635   946 E ActivityManager: 	at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:3324)
+12-20 11:41:15.707   635   946 E ActivityManager: 	at android.os.Binder.execTransact(Binder.java:731)
+12-20 11:41:15.708   635  3657 V IntentResolver: Resolving type=null scheme=null defaultOnly=false userId=0 of Intent { act=com.amazon.whisperlink.actview.ui.SELECTION flg=0x8 }
+12-20 11:41:15.708   635  3657 V IntentResolver: Action list: null
+12-20 11:41:15.708   635  3657 V IntentResolver: Final result list:
+12-20 11:41:15.709  1312  1312 D DeviceCapabilityServer-AppChangeTrigger: onReceive: android.intent.action.PACKAGE_REMOVED
+12-20 11:41:15.709  1312  1312 D DeviceCapabilityServer-DeviceCapabilityTrigger: publishCapabilities force (false) token (b3db668c-6cf1-4c9e-8d46-9e8f2b64fb91) client (null)
+12-20 11:41:15.712  1479  2937 I SALE_SaleService: PackageStatusReceiver: package added: com.relay.pure
+12-20 11:41:15.716  9290  9290 I Finsky  : [2] ahmo - Received: android.intent.action.PACKAGE_ADDED, [m-IzUI3Ppiii2emxMknHt6uFica8dyvx3CiYpkno5lM]
+12-20 11:41:15.716  9290  9335 I Finsky  : [1401] AIM: Got app ownership map. App counts: . Unique apps: 0
+12-20 11:41:15.716  9290  9335 E Finsky  : [1401] [Counters] attempted to use a non-positive increment for: 4752
+12-20 11:41:15.718  1406  1663 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+12-20 11:41:15.724 18927 18946 I ContentSyncFramework: Scheduling job CLIENT_SYNC_SERVICE:PACKAGE_REPLACED, with id: 3 for action android.intent.action.PACKAGE_REPLACED
+12-20 11:41:15.731  9290  9343 I Finsky  : [1408] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=1, cacheMissCount=0. Missed  in cache (limit 10) : []
+12-20 11:41:15.732  9290  9335 I Finsky  : [1401] AIM: Got app ownership map. App counts: . Unique apps: 0
+12-20 11:41:15.733  9290  9335 E Finsky  : [1401] [Counters] attempted to use a non-positive increment for: 4752
+12-20 11:41:15.733  9290  9335 E Finsky  : [1401] [Counters] attempted to use a non-positive increment for: 4753
+12-20 11:41:15.736  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4753
+12-20 11:41:15.742  9290  9316 I android.vendin: Waiting for a blocking GC ProfileSaver
+12-20 11:41:15.743  9290 16171 I Finsky  : [1749] SCH: Received scheduling request: Id: 12-1, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+12-20 11:41:15.746 15355 15355 I Finsky:background: [2] IQ: onPackageRemoved com.relay.pure, replacing=true, uninstallingFromPlay=false
+12-20 11:41:15.748 15355 15355 I Finsky:background: [2] ahme - Received: android.intent.action.PACKAGE_ADDED, [m-IzUI3Ppiii2emxMknHt6uFica8dyvx3CiYpkno5lM]
+12-20 11:41:15.751  9290  9290 I Finsky  : [2] DTU: Received onPackageAdded, replacing: true
+12-20 11:41:15.753  9290  9290 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.relay.pure]
+12-20 11:41:15.753  9290  9290 I Finsky  : [2] AIM: AppInfoManager-Perf > getApps > called for 1 apps
+12-20 11:41:15.754  9290  9342 I Finsky  : [1407] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.relay.pure]
+12-20 11:41:15.754 18927 18946 I ContentSyncFramework: Job with id 3 schedule status is 1: 
+12-20 11:41:15.754  9290  9342 I Finsky  : [1407] AIM: Got app ownership map. App counts: . Unique apps: 0
+12-20 11:41:15.755  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4752
+12-20 11:41:15.755 18927 18946 I ContentSyncFramework: Scheduling job CSF_MAINTENANCE_SERVICE:PACKAGE_REPLACED, with id: 1002 for action android.intent.action.PACKAGE_REPLACED
+12-20 11:41:15.757   635   711 D AmazonWindowMetrics: On window event - Package com.teslacoilsw.launcher, isDreaming false, state 1, alexaMode 0
+12-20 11:41:15.764  9290 16171 I Finsky  : [1749] SCH: Received scheduling request: Id: 12-1, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+12-20 11:41:15.758  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4753
+12-20 11:41:15.768   635   716 I InputReader: Reconfiguring input devices.  changes=0x00000010
+12-20 11:41:15.771   635   635 W system_server: Unknown chunk type '200'.
+12-20 11:41:15.771   635   635 I chatty  : uid=1000 system_server identical 1 line
+12-20 11:41:15.772   635   635 W system_server: Unknown chunk type '200'.
+12-20 11:41:15.774 18927 18946 I ContentSyncFramework: Job with id 1002 schedule status is 1: 
+12-20 11:41:15.782  1294  1605 I MinervaServiceManager: com.amazon.minerva.service.IonMetricEvent@d0a39c9
+12-20 11:41:15.784   635   716 I InputReader: Reconfiguring input devices.  changes=0x00000010
+12-20 11:41:15.793  1294  1605 D UserControlVerifier: Current metric collection switch is: 0
+12-20 11:41:15.796 15355 16190 I Finsky:background: [1623] IQ: handled package removed
+12-20 11:41:15.798   635   716 I InputReader: Reconfiguring input devices.  changes=0x00000010
+12-20 11:41:15.798   635   660 I ActivityManager: Displayed com.teslacoilsw.launcher/.NovaLauncher: +331ms
+12-20 11:41:15.798  1294  1605 W MinervaServiceManager: Metric event was dropped due to user control. metricGroupId: pmg53s7o, schemaId: 'tp5i/2/0b880410'
+12-20 11:41:15.802  3148  3148 I WhisperLink: WhisperlinkConfig - Found services: amzn.photos,  for package: com.amazon.photos;
+12-20 11:41:15.804  3148  3148 I WhisperLink: WhisperlinkConfig - Found services: amzn.vkick,  for package: com.amazon.dee.app;
+12-20 11:41:15.815  1434 16180 I Fitness : (REDACTED) FitCleanupIntentOperation received Intent %s
+12-20 11:41:15.818   635  6538 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.android.musicfx/.Compatibility$Receiver
+12-20 11:41:15.820   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemonitor.impl.PackageMonitorReceiverImpl$RegisteredReceiver
+12-20 11:41:15.820   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemonitor.backgroundimpl.BackgroundPackageMonitorReceiverImpl$RegisteredReceiver
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.instantapps.appmanagement.InstantAppRemoveMonitor
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.google.android.apps.adm/com.google.android.libraries.social.peoplekit.thirdparty.viewcontrollers.ThirdPartyReceiver
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.google.android.apps.photos/com.google.android.libraries.social.peoplekit.thirdparty.viewcontrollers.ThirdPartyReceiver
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to net.dinglisch.android.taskerm/.ReceiverStaticAlwaysOn
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.amazon.sync.service/com.amazon.sync.framework.receivers.ApplicationChangedReceiver
+12-20 11:41:15.821   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to amazon.speech.sim/amazon.speech.simclient.endpointstate.defaultvalue.DefaultStateTrigger
+12-20 11:41:15.827 20222 20222 D com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver.PII: LWA onReceive : action=android.intent.action.PACKAGE_ADDED, isReplacing= true data=:<obscured>
+12-20 11:41:15.827 20222 20222 I com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver: LWA onRecieve : Package is being replaced, will leave this to ACTION_PACKAGE_REPLACED receiver
+12-20 11:41:15.831   635 29022 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.amazon.nimh/.device.management.PackageInstalledReceiver
+12-20 11:41:15.839  9290  9342 I Finsky  : [1407] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=1, cacheMissCount=0. Missed  in cache (limit 10) : []
+12-20 11:41:15.843   635 29022 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.android.musicfx/.Compatibility$Receiver
+12-20 11:41:15.845   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.svox.pico/.VoiceDataInstallerReceiver
+12-20 11:41:15.845   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemonitor.impl.PackageMonitorReceiverImpl$RegisteredReceiver
+12-20 11:41:15.845   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemonitor.backgroundimpl.BackgroundPackageMonitorReceiverImpl$RegisteredReceiver
+12-20 11:41:15.845   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+12-20 11:41:15.846   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+12-20 11:41:15.846   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED (has data) flg=0x4000010 (has extras) } to net.dinglisch.android.taskerm/.ReceiverStaticAlwaysOn
+12-20 11:41:15.846   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.amazon.sync.service/com.amazon.sync.framework.receivers.ApplicationChangedReceiver
+12-20 11:41:15.846   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to amazon.speech.sim/amazon.speech.simclient.endpointstate.defaultvalue.DefaultStateTrigger
+12-20 11:41:15.846  9290  9342 I Finsky  : [1407] AIM: Got app ownership map. App counts: . Unique apps: 0
+12-20 11:41:15.847  1434 16183 I FontLog : (REDACTED) Package %s has no metadata
+12-20 11:41:15.848 20222 20222 D com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver.PII: LWA onReceive : action=android.intent.action.PACKAGE_REPLACED, isReplacing= true data=:<obscured>
+12-20 11:41:15.848 20222 20222 I com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver: LWA onRecieve : Calling sync service
+12-20 11:41:15.853  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4752
+12-20 11:41:15.854  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4753
+12-20 11:41:15.854   635 29022 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.amazon.platform.fdrw/.PackageWhitelistingHandler
+12-20 11:41:15.855   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.android.musicfx/.Compatibility$Receiver
+12-20 11:41:15.855   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.google.android.apps.photos/.account.full.FetchAccountPropertiesAppUpgradeBroadcastReceiver
+12-20 11:41:15.855   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.google.android.apps.photos/.account.full.SyncAccountsForLoginBroadcastReceiver
+12-20 11:41:15.855   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.google.android.apps.photos/.notificationchannels.AppUpdateBroadcastReceiver
+12-20 11:41:15.856   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+12-20 11:41:15.856   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+12-20 11:41:15.856   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED (has data) flg=0x4000010 (has extras) } to net.dinglisch.android.taskerm/.ReceiverStaticAlwaysOn
+12-20 11:41:15.861 12038 16184 I Auth    : (REDACTED) [SupervisedAccountIntentOperation] onHandleIntent: %s
+12-20 11:41:15.870   635   644 I system_server: Background concurrent copying GC freed 122954(5MB) AllocSpace objects, 17(676KB) LOS objects, 16% free, 29MB/35MB, paused 297us total 294.639ms
+12-20 11:41:15.871 20222 16207 I com.amazon.identity.auth.device.authorization.appsync.PackageChangedService: Syncing app with device
+12-20 11:41:15.872 20222 16207 I com.amazon.identity.auth.device.authorization.utils.ThirdPartyUtils: Getting static context
+12-20 11:41:15.873 20222 16207 D com.amazon.identity.auth.device.authorization.appsync.Syncer.PII: Syncing app with device : packageName=:<obscured>
+12-20 11:41:15.874 20222 16207 D com.amazon.identity.auth.device.appid.AbstractAppIdentifier.PII: getAppInfoFromAPIKey : packageName=:<obscured>
+12-20 11:41:15.874 20222 16207 D com.amazon.identity.auth.device.appid.AbstractAppIdentifier.PII: Finding API Key for :<obscured>
+12-20 11:41:15.879  1406  1419 I coilsw.launche: Background concurrent copying GC freed 16765(929KB) AllocSpace objects, 3(216KB) LOS objects, 38% free, 9MB/15MB, paused 109us total 124.167ms
+12-20 11:41:15.882 12038 16197 I NearbyDiscovery: (REDACTED) processGrantSlicePermission: %s
+12-20 11:41:15.888 12038 12038 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+12-20 11:41:15.888 12038 12038 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+12-20 11:41:15.895 20222 16207 I com.amazon.identity.auth.device.utils.ThirdPartyResourceParser: Unable to get api key asset document: api_key.txt
+12-20 11:41:15.895 20222 16207 W com.amazon.identity.auth.device.utils.ThirdPartyResourceParser: Unable to get API Key from Assests
+12-20 11:41:15.895 20222 16207 I com.amazon.identity.auth.device.utils.ThirdPartyResourceParser: Attempting to parse API Key from meta data in Android manifest
+12-20 11:41:15.897 20222 16207 I com.amazon.identity.auth.device.utils.ThirdPartyResourceParser: Attempting to parse API Key from meta data in Android manifest
+12-20 11:41:15.897 20222 16207 D com.amazon.identity.auth.device.appid.APIKeyDecoder.PII: Begin decoding API Key for packageName=:<obscured>
+12-20 11:41:15.897 20222 16207 D com.amazon.identity.auth.device.appid.APIKeyDecoder.PII: APIKey:<obscured>
+12-20 11:41:15.897 20222 16207 W com.amazon.identity.auth.device.appid.APIKeyDecoder: Unable to decode APIKey for pkg=com.relay.pure
+12-20 11:41:15.906 15355 16176 I Finsky:background: [1621] Wrote row to frosting DB: 35858
+12-20 11:41:15.929  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > ItemModel > CacheSize=82, cacheHitCount=0, cacheMissCount=0, total appsWithNoServerDataCount=3. Missed  in cache (limit 10) : []
+12-20 11:41:15.941   635   635 W Looper  : Slow dispatch took 217ms main h=android.app.ActivityThread$H c=android.app.-$$Lambda$LoadedApk$ReceiverDispatcher$Args$_BumDX2UKsnxLVrE6UJsJZkotuA@f66050e m=0
+12-20 11:41:15.941   635   635 W Looper  : Slow delivery took 276ms main h=android.app.ActivityThread$H c=android.app.-$$Lambda$LoadedApk$ReceiverDispatcher$Args$_BumDX2UKsnxLVrE6UJsJZkotuA@ace9b2f m=0
+12-20 11:41:15.957 15355 16176 I Finsky:background: [1621] Wrote row to frosting DB: 35859
+12-20 11:41:15.964  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > ItemModel > CacheSize=82, cacheHitCount=0, cacheMissCount=0, total appsWithNoServerDataCount=3. Missed  in cache (limit 10) : []
+12-20 11:41:15.977  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > ItemModel > CacheSize=78, cacheHitCount=0, cacheMissCount=0, total appsWithNoServerDataCount=3. Missed  in cache (limit 10) : []
+12-20 11:41:15.980   635   635 V BackupManagerConstants: getFullBackupIntervalMilliseconds(...) returns 86400000
+12-20 11:41:15.983 15355 16176 I Finsky:background: [1621] Wrote row to frosting DB: 35860
+12-20 11:41:15.986  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > ItemModel > CacheSize=78, cacheHitCount=0, cacheMissCount=0, total appsWithNoServerDataCount=3. Missed  in cache (limit 10) : []
+12-20 11:41:15.994 18927 18946 I ContentSyncFramework: BaseService.onStartJob executing job with id: 3
+12-20 11:41:15.995  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > getApps > data collection finished
+12-20 11:41:15.997 15355 16176 I Finsky:background: [1621] Wrote row to frosting DB: 35861
+12-20 11:41:15.998   635   635 W Looper  : Drained
+12-20 11:41:15.998  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > maybeDestroyAppInfoManager is called. actives = 2
+12-20 11:41:15.999  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > getApps > data collection finished
+12-20 11:41:15.999  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > maybeDestroyAppInfoManager is called. actives = 1
+12-20 11:41:16.000 18927 18946 I ContentSyncFramework: BaseService.onStartJob executing job with id: 1002
+12-20 11:41:16.018 18927 18946 I ContentSyncFramework: performSyncIfNeededForIntent android.intent.action.PACKAGE_REPLACED
+12-20 11:41:16.020 18927 18946 I ContentSyncFramework: No SyncProviders match for intent android.intent.action.PACKAGE_REPLACED
+12-20 11:41:16.020 18927 18946 I ContentSyncFramework: BaseService.runJobFinished JobId: 3 needsReschedule : false
+12-20 11:41:16.033   635   651 W system_server: resources.arsc in APK '/system/priv-app/DeviceClientPlatformContractsFramework/DeviceClientPlatformContractsFramework.apk' is compressed.
+12-20 11:41:16.037 18927 18946 I ContentSyncFramework: BaseService.runJobFinished JobId: 1002 needsReschedule : false
+12-20 11:41:16.041  9290  9329 I Finsky  : [1395] WM::SCH: Logging work initialize for 12-1
+12-20 11:41:16.046  9290  9329 I Finsky  : [1395] WM::SCH: Logging work initialize for 12-1
+12-20 11:41:16.066  9290  9335 I Finsky  : [1401] SCH: Scheduling phonesky job Id: 12-1, CT: 1766248875764, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+12-20 11:41:16.077  9290  9335 I Finsky  : [1401] SCH: Scheduling 1 system job(s)
+12-20 11:41:16.077  9290  9335 I Finsky  : [1401] SCH: Scheduling system job Id: 9219, L: 14687, D: 86037891, C: false, I: false, N: 1
+12-20 11:41:16.089  9290  9332 I Finsky  : [1398] [ContentSync] finished, scheduled=true
+12-20 11:41:16.092  9290  9335 I Finsky  : [1401] SCH: Scheduling phonesky job Id: 12-1, CT: 1766248875745, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+12-20 11:41:16.102  9290  9335 I Finsky  : [1401] SCH: Scheduling 1 system job(s)
+12-20 11:41:16.103  9290  9335 I Finsky  : [1401] SCH: Scheduling system job Id: 9219, L: 14642, D: 86037865, C: false, I: false, N: 1
+12-20 11:41:16.121  9290  9329 I Finsky  : [1395] [ContentSync] finished, scheduled=true
+12-20 11:41:16.147 15355 15363 W System  : A resource failed to call close. 
+12-20 11:41:16.147 15355 15363 W SQLiteConnectionPool: A SQLiteConnection object for database '/data/user/0/com.android.vending/databases/resource_data.db' was leaked!  Please fix your application to end transactions in progress properly and to close the database when it is no longer needed.
+12-20 11:41:16.147 15355 15363 W System  : A resource failed to call close. 
+12-20 11:41:16.147 15355 15363 W System  : A resource failed to call close. 
+12-20 11:41:16.147 15355 15363 W SQLiteConnectionPool: A SQLiteConnection object for database '/data/user/0/com.android.vending/databases/installer_data_v2.db' was leaked!  Please fix your application to end transactions in progress properly and to close the database when it is no longer needed.
+12-20 11:41:16.147 15355 15363 W System  : A resource failed to call close. 
+12-20 11:41:16.152 12038 12115 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=36
+12-20 11:41:16.166 12038 12038 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService (has data) cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+12-20 11:41:16.166 12038 12038 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService (has data) cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+12-20 11:41:16.190   635   651 W system_server: Unknown chunk type '200'.
+12-20 11:41:16.198 12038 12095 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=30
+12-20 11:41:16.200 12038 12818 I Icing   : Usage reports ok 1, Failed Usage reports 0, indexed 0, rejected 0
+12-20 11:41:16.209  1312  1312 W DeviceCapabilityServer-DeviceCapabilityTrigger: Failed to wait long enough for initialization
+12-20 11:41:16.211  1312  1312 I DeviceCapabilityServer-DeviceCapabilityTrigger: Trigger (AppChangeTrigger) has requested a capability publish, Scheduled (NOT_INITIALIZED)
+12-20 11:41:16.211  1312  1312 I SPCH-SIM_PackageChangedReceiver: Intent action: android.intent.action.PACKAGE_ADDED
+12-20 11:41:16.211  1312  1312 I SPCH-SIM_BroadcastPackageChangedListener: Broadcasting package added
+12-20 11:41:16.213   635  3443 E ActivityManager: Sending non-protected broadcast com.amazon.alexa.android.intent.action.PACKAGE_ADDED from system 1312:amazon.speech.sim/u0a7 pkg com.amazon.media.session.monitor
+12-20 11:41:16.213   635  3443 E ActivityManager: java.lang.Throwable
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at com.android.server.am.ActivityManagerService.checkBroadcastFromSystem(ActivityManagerService.java:21473)
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at com.android.server.am.ActivityManagerService.broadcastIntentLocked(ActivityManagerService.java:22082)
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at com.android.server.am.ActivityManagerService.broadcastIntent(ActivityManagerService.java:22224)
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact$broadcastIntent$(IActivityManager.java:10172)
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact(IActivityManager.java:167)
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:3324)
+12-20 11:41:16.213   635  3443 E ActivityManager: 	at android.os.Binder.execTransact(Binder.java:731)
+12-20 11:41:16.214  1312  1312 D DeviceCapabilityServer-AppChangeTrigger: onReceive: android.intent.action.PACKAGE_ADDED
+12-20 11:41:16.214  1312  1312 D DeviceCapabilityServer-DeviceCapabilityTrigger: publishCapabilities force (false) token (873f8fd4-2872-4df9-a848-664e375950d6) client (null)
+12-20 11:41:16.254 12038 12818 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+12-20 11:41:16.272 12038 12818 I Icing   : Indexing com.google.android.gms-apps from com.google.android.gms
+12-20 11:41:16.282  9290  9316 I android.vendin: WaitForGcToComplete blocked ProfileSaver on HeapTrim for 540.525ms
+12-20 11:41:16.293   635   651 W Searchables: No web search activity found
+12-20 11:41:16.314 12038 12818 I Icing   : Indexing done com.google.android.gms-apps
+12-20 11:41:16.315   635   651 W Searchables: No web search activity found
+12-20 11:41:16.316   635   651 W VoiceInteractionManagerService: no available voice recognition services found for user 0
+12-20 11:41:16.317   635   651 W LocationProviderProxy-network: com.google.android.gms resolves service com.android.location.service.v3.NetworkLocationProvider, but has wrong signature, ignoring
+12-20 11:41:16.318   635   651 W LocationProviderProxy-fused: com.google.android.gms resolves service com.android.location.service.FusedLocationProvider, but has wrong signature, ignoring
+12-20 11:41:16.318   635   651 W GeocoderProxy: com.google.android.gms resolves service com.android.location.service.GeocodeProvider, but has wrong signature, ignoring
+12-20 11:41:16.318   635   651 W GeofenceProxy: com.google.android.gms resolves service com.android.location.service.GeofenceProvider, but has wrong signature, ignoring
+12-20 11:41:16.318   635   651 W GeofenceProxy: Odd, no component found for service com.android.location.service.GeofenceProvider
+12-20 11:41:16.319   635   651 W ActivityRecognitionProxy: com.google.android.gms resolves service com.android.location.service.ActivityRecognitionProvider, but has wrong signature, ignoring
+12-20 11:41:16.319   635   651 W ActivityRecognitionProxy: Odd, no component found for service com.android.location.service.ActivityRecognitionProvider
+12-20 11:41:16.319   635   651 I PackageRecency: Package com.relay.pure has changed
+12-20 11:41:16.319   635   651 W PackageRecency: No listeners found
+12-20 11:41:16.412   635   654 I ActivityManager: Start proc 16218:com.android.providers.calendar/u0a97 for content provider com.android.providers.calendar/.CalendarProvider2
+12-20 11:41:16.419 16218 16218 E viders.calenda: Not starting debugger since process cannot load the jdwp agent.
+12-20 11:41:16.432   635   946 D ActivityManager: Raise procstate to external provider: ProcessRecord{a3c90f5 16218:com.android.providers.calendar/u0a97}
+12-20 11:41:16.444 16218 16218 I viders.calenda: The ClassLoaderContext is a special shared library.
+12-20 11:41:16.445 16218 16218 I chatty  : uid=10097(com.android.providers.calendar) identical 1 line
+12-20 11:41:16.450 16218 16218 I viders.calenda: The ClassLoaderContext is a special shared library.
+12-20 11:41:16.452 16218 16218 W viders.calenda: ClassLoaderContext classpath size mismatch for position 0. expected=0, found=3 (PCL[] | PCL[/system/framework/org.apache.http.legacy.boot.jar*796383208:/system/framework/com.amazon.identity.auth.device.jar*2297351494:/system/framework/retaildemoapi.jar*4019160098])
+12-20 11:41:16.455 16218 16218 I viders.calenda: The ClassLoaderContext is a special shared library.
+12-20 11:41:16.461 16218 16218 I viders.calenda: The ClassLoaderContext is a special shared library.
+12-20 11:41:16.515 16218 16218 I CalendarProvider2: Created com.android.providers.calendar.CalendarAlarmManager@be669f3(com.android.providers.calendar.CalendarProvider2@a5556b0)
+12-20 11:41:16.517 16218 16234 I DemoManagerConstants: Checking the FOS version to set DEMO_CONTENT_DIR --- Device SDK version > 27 
+12-20 11:41:16.518   635  3443 W Binder  : Outgoing transactions from this process must be FLAG_ONEWAY
+12-20 11:41:16.518   635  3443 W Binder  : java.lang.Throwable
+12-20 11:41:16.518   635  3443 W Binder  : 	at android.os.BinderProxy.transact(Binder.java:1116)
+12-20 11:41:16.518   635  3443 W Binder  : 	at android.content.ContentProviderProxy.getType(ContentProviderNative.java:451)
+12-20 11:41:16.518   635  3443 W Binder  : 	at com.android.server.am.ActivityManagerService.getProviderMimeType(ActivityManagerService.java:13170)
+12-20 11:41:16.518   635  3443 W Binder  : 	at android.app.IActivityManager$Stub.onTransact(IActivityManager.java:1416)
+12-20 11:41:16.518   635  3443 W Binder  : 	at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:3324)
+12-20 11:41:16.518   635  3443 W Binder  : 	at android.os.Binder.execTransact(Binder.java:731)
+12-20 11:41:16.522 16218 16234 I DemoManagerImpl: Demo flag observer registered. demoFlagObservers='[]', Observer='com.amazon.pim.platform.DemoModeHelper$DemoObserver@911bee5'
+12-20 11:41:16.522 16218 16234 I DemoManagerImpl: false
+12-20 11:41:16.533 16218 16218 I ...h.device.api.MAPInit: Initializing MAP (130050002 / MAPAndroidLib-1.1.258112.0) for app com.android.providers.calendar. MAP release version: 20210527P
+12-20 11:41:16.543 16218 16218 W ...lendar/MetricsHelper: ThirdParty DCP metrics not supported
+12-20 11:41:16.551 16218 16218 I ...ures.FeatureSetCache: Caching feature IsolateApplication as false
+12-20 11:41:16.553 16218 16218 I ...lendar/MetricsHelper: FireOS DCP metrics is supported
+12-20 11:41:16.553 16218 16218 I ...lendar/MetricsHelper: Using the FireOSPlatformDCPMetricsCollector
+12-20 11:41:16.557 16218 16218 V MetricsServiceConnection: getService : Sent explicit intent to bind to metrics service. Service will be bound asynchronously.
+12-20 11:41:16.557 16218 16218 D AndroidMetricsFactoryImpl: shouldRecordMetrics : First time check recordMetricsSetting
+12-20 11:41:16.557 16218 16218 D MetricsServiceWrapper: getRecordMetricsSetting : metrics service is not yet registed with the ServiceManager, use default record Metrics setting: true.
+12-20 11:41:16.557 16218 16218 D AndroidMetricsFactoryImpl: shouldRecordMetrics : lastRecordSettingReadTime after IPC call getRecordMetricsSetting : 1766248876557
+12-20 11:41:16.559 16218 16218 W MetricsServiceWrapper: record : MetricsService not yet bound. Buffering MetricRecord. Program=com.android.providers.calendar Source=MAPInit:initialize
+12-20 11:41:16.560 16218 16218 I ...lendar/MetricsHelper: FireOS Periodic metrics is supported
+12-20 11:41:16.561 16218 16218 I ...odicMetricsCollector: Successfully create FireOSPeriodicMetricsCollector.
+12-20 11:41:16.562 16218 16218 I ...h.device.api.MAPInit: Running MAPInit on main thread: true
+12-20 11:41:16.564 16218 16237 I ...entralTrustLogicImpl: Current package is: com.android.providers.calendar. Directly trust central package: com.amazon.imp, since it is system MAP library
+12-20 11:41:16.565 16218 16237 I ...tils.CentralApkUtils: Retrieved central APK info from package manager using content provider content://com.amazon.map.generic_ipc. The package name is : com.amazon.imp and version is: 130459510.
+12-20 11:41:16.569 16218 16218 V MetricsServiceConnection: onServiceConnected : service android.os.BinderProxy@84f755e
+12-20 11:41:16.571 16218 16238 I ...taStorageFactoryImpl: Creating new DataStorageFactoryImpl
+12-20 11:41:16.572 16218 16238 I ...amework.MAPInitTasks: Get DataStorage instance for initialization
+12-20 11:41:16.572 16218 16238 I ...taStorageFactoryImpl: Initializing new DataStorage
+12-20 11:41:16.573 16218 16238 I ...DeviceAttributeCache: Setting device attribute CentralAPK to true
+12-20 11:41:16.574 16218 16238 I ...taStorageFactoryImpl: Creating and using new NonCanonicalDataStorage
+12-20 11:41:16.579 16218 16238 I ...e.LocalKeyValueStore: Create DE shared preference, OS supports direct boot.
+12-20 11:41:16.582 16218 16238 I ...rustedPackageManager: Trying to use default signature based package trust logic. This should be on 3P device
+12-20 11:41:16.582 16218 16238 I ...rustedPackageManager: Setting package trust logic as: signature based package trust logic
+12-20 11:41:16.591 16218 16238 I ...amework.MAPInitTasks: Initialize DataStorage instance
+12-20 11:41:16.591 16218 16238 I ...amework.MAPInitTasks: Setup DataStorage instance
+12-20 11:41:16.592 16218 16238 I ...e.LocalKeyValueStore: Create DE shared preference, OS supports direct boot.
+12-20 11:41:16.617 16218 16238 I ...amework.MAPInitTasks: Start update legacy authportal domain in database if needed
+12-20 11:41:16.618 16218 16238 W ...h.device.api.MAPInit: AdsIdentity class not found.
+12-20 11:41:16.714  1312  1312 W DeviceCapabilityServer-DeviceCapabilityTrigger: Failed to wait long enough for initialization
+12-20 11:41:16.714  1312  1312 I DeviceCapabilityServer-DeviceCapabilityTrigger: Trigger (AppChangeTrigger) has requested a capability publish, Scheduled (NOT_INITIALIZED)
+12-20 11:41:16.891   635   728 E WifiVendorHal: getWifiLinkLayerStats(l.937) failed {.code = ERROR_NOT_SUPPORTED, .description = }
+12-20 11:41:17.499   459   459 I thermal_repeater: socket -1
+12-20 11:41:17.575 16218 16218 I CalendarProvider2: Sending notification intent: Intent { act=android.intent.action.PROVIDER_CHANGED (has data) }
+12-20 11:41:17.575 16218 16218 W ContentResolver: Failed to get type for: content://com.android.calendar (Unknown URL content://com.android.calendar)
+12-20 11:41:16.518   635   946 I chatty  : uid=1000(system) Binder:635_3 identical 2 lines
+12-20 11:41:16.518   635   946 D ActivityManager: Raise procstate to external provider: ProcessRecord{a3c90f5 16218:com.android.providers.calendar/u0a97}
+12-20 11:41:17.578   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PROVIDER_CHANGED (has data) flg=0x10 } to com.google.android.calendar/com.android.calendar.widget.CalendarAppWidgetProvider
+12-20 11:41:17.587   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PROVIDER_CHANGED (has data) flg=0x10 } to com.google.android.calendar/.widgetmonth.MonthViewWidgetModelRefresher
+12-20 11:41:17.587   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PROVIDER_CHANGED (has data) flg=0x10 } to com.google.android.calendar/com.google.android.apps.calendar.usernotifications.NotificationsRelevantUpdatesReceiver
+12-20 11:41:17.588   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PROVIDER_CHANGED (has data) flg=0x10 } to com.google.android.gms/.chimera.GmsIntentOperationService$GmsExternalReceiver
+12-20 11:41:18.521   635  1299 V BackupManagerConstants: getFullBackupRequiredNetworkType(...) returns 2
+12-20 11:41:18.521   635  1299 V BackupManagerConstants: getFullBackupRequireCharging(...) returns true
+12-20 11:41:18.907   463   463 I thermal_src: recvmsg_expect 2, but get 6 
+12-20 11:41:18.907   463   463 V thermal_src: waiting NOTIFY from kernel miss, -1
+12-20 11:41:19.917   635   728 E WifiVendorHal: getWifiLinkLayerStats(l.937) failed {.code = ERROR_NOT_SUPPORTED, .description = }
+12-20 11:41:20.167   444   468 E storaged: getDiskStats failed with result NOT_SUPPORTED and size 0
+12-20 11:41:20.579 16244 16244 E ion     : ioctl c0044901 failed with code -1: Invalid argument
+12-20 11:41:20.574 16244 16244 W screencap: type=1400 audit(0.0:1351): avc: denied { search } for name="clients" dev="debugfs" ino=2406 scontext=u:r:shell:s0 tcontext=u:object_r:debugfs_ion:s0 tclass=dir permissive=0
+12-20 11:41:22.500   459   459 I thermal_repeater: socket -1
+12-20 11:41:22.804  1312  1800 I SPCH-SIM_AccountRegisteredCondition: isMet
+12-20 11:41:22.808  1312  1800 I SPCH-SIM_SpeechInteractionService: Account Registered Condition Check account (true) available (false)
+12-20 11:41:22.808  1312  1800 I SPCH-SIM_SpeechInteractionService: Account Registered Condition Check Restarting in (60000) ms
+12-20 11:41:22.934   635   728 E WifiVendorHal: getWifiLinkLayerStats(l.937) failed {.code = ERROR_NOT_SUPPORTED, .description = }
+12-20 11:41:25.957   635   728 E WifiVendorHal: getWifiLinkLayerStats(l.937) failed {.code = ERROR_NOT_SUPPORTED, .description = }
+12-20 11:41:26.219  1434 16206 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: Flags cannot be read
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: java.lang.IllegalStateException: Must call PhenotypeContext.setContext() first
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m5.op.a(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):46)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m5.alr.a(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):3)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m5.dc.a(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):217)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at com.google.android.gms.common.GoogleCertificatesImpl.isPackageGoogleOrPlatformSigned(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):7)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m5.ia.x(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):64)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m5.bw.onTransact(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):21)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at android.os.Binder.transact(Binder.java:667)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.cqm.b(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):8)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.dhc.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):57)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.dhr.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):83)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.dhr.g(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):22)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.dhr.e(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):1)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.ihx.c(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):43)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at com.google.android.gms.games.service.PlayGamesSyncServiceMain.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):291)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.rwj.call(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):30)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.ebd.c(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):50)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at m26.ebd.run(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):73)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1167)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:641)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at bdet.run(:com.google.android.gms@254932013@25.49.32 (100400-843446962):8)
+12-20 11:41:26.229 12038 14492 W GoogleCertificatesImpl: 	at java.lang.Thread.run(Thread.java:764)
+12-20 11:41:26.231 12038 14492 I PlayGamesServices[GamesSyncAdapter]: Starting sync for 35f6675
+12-20 11:41:26.234 12038 14492 I PlayGamesServices[GamesSyncAdapter]: Sync duration for 35f6675: 2
+12-20 11:41:26.252  1434 16249 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+12-20 11:41:26.260 12038 12114 W PlayGamesServices[UiUtils]: AppVersion: Cannot find the installed destination app.
+12-20 11:41:26.261 12038 12114 I GetServiceValidatorImpl: (REDACTED) onGetService() from Client SDK version [%s], Module version [%s], PGA version [%s], Account [%s], Calling package [%s], Game package [%s]
+12-20 11:41:26.263 12038 12114 W GetGamesServiceReqFacto: Parsing request with ignored arguments. signInOptionsBundle [Bundle[{com.google.android.gms.signin.internal.serverClientId=null, com.google.android.gms.signin.internal.usePromptModeForAuthCode=true, com.google.android.gms.signin.internal.logSessionId=null, com.google.android.gms.signin.internal.hostedDomain=null, com.google.android.gms.signin.internal.offlineAccessRequested=false, com.google.android.gms.signin.internal.waitForAccessTokenRefresh=false, com.google.android.gms.signin.internal.clientRequestedAccount=Account {name=<<default account>>, type=com.google}, com.google.android.gms.signin.internal.idTokenRequested=false, com.google.android.gms.signin.internal.forceCodeForRefreshToken=false}]], isRetryingSignIn [false], skipWelcomePopup [false], requireGooglePlus [false]
+12-20 11:41:26.263 12038 12114 I GetGamesServiceReqFacto: Replacing request for `games` scope with `games_lite`
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: Flags cannot be read
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: java.lang.IllegalStateException: Must call PhenotypeContext.setContext() first
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m5.op.a(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):46)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m5.alr.a(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):3)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m5.dc.a(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):217)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at com.google.android.gms.common.GoogleCertificatesImpl.isPackageGoogleOrPlatformSigned(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):7)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m5.ia.x(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):64)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m5.bw.onTransact(:com.google.android.gms.dynamite_googlecertificates@254932013@25.49.32 (100400-0):21)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at android.os.Binder.transact(Binder.java:667)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.cqm.b(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):8)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.dhc.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):57)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.dhr.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):83)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.dhr.d(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):1)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.fgz.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):3)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.fzi.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):11)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.fxt.b(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):12)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.dcp.a(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):46)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at m26.dce.run(:com.google.android.gms.optional_games@254932017@25.49.32 (100000-0):5)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1167)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:641)
+12-20 11:41:26.279 12038 16253 W GoogleCertificatesImpl: 	at java.lang.Thread.run(Thread.java:764)
+12-20 11:41:26.282 12038 16253 I SignInPerformer-17: (REDACTED) Handling request [%s], isFirstPartyCaller [%s]
+12-20 11:41:26.285 12038 16253 I SignInPerformer-17: Successfully brokered first-party unauthenticated GamesService [CONTEXT service_id=1 ]
+12-20 11:41:26.288 12038 16253 I GetGamesServiceV2Op: (REDACTED) Successfully brokered GamesService for request %s
+12-20 11:41:26.290 12038 12114 W PlayGamesServices[UiUtils]: AppVersion: Cannot find the installed destination app.
+12-20 11:41:26.290 12038 12114 W PlayGamesServices[UiUtils]: AppVersionName: Cannot find the installed destination app.
+12-20 11:41:26.308  1434 16250 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+12-20 11:41:26.326  1434 16249 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+12-20 11:41:27.501   459   459 I thermal_repeater: socket -1
