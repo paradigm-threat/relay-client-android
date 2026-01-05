@@ -18,10 +18,8 @@ import java.io.InputStreamReader
 class MainActivity : AppCompatActivity() {
     private lateinit var hookRenderer: HookRenderer
     private lateinit var tabContainer: LinearLayout
-    private lateinit var nativeLabel: TextView
     private lateinit var versionLabel: TextView
-    private lateinit var nativeJniBtn: Button
-    private lateinit var nativeJnaBtn: Button
+    private val repoTabs = mutableMapOf<String, Button>()
     
     private var currentHookPath: String = "home.jsx"
     private var availableThemes: List<String> = emptyList()
@@ -48,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         // Add default tabs
         addTab("Home", "home.jsx")
         addTab("Settings", "settings.jsx")
-        addTab("Repos", "repo.jsx")
+        addTab("Style tests", "test.jsx")
 
         // Right-aligned runtime selector group
         val bottomBar = LinearLayout(this).apply {
@@ -64,33 +62,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(16, 8, 16, 8)
         }
 
-        // Native mode selector row
-        val nativeRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        nativeLabel = TextView(this).apply {
-            text = "Native: --"
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            setPadding(16, 16, 16, 16)
-        }
-        nativeJniBtn = Button(this).apply {
-            text = "ANDROID"
-            textSize = 12f
-            setOnClickListener { hookRenderer.setRendererMode(RendererMode.ANDROID) }
-        }
-        nativeJnaBtn = Button(this).apply {
-            text = "ACT"
-            textSize = 12f
-            setOnClickListener { hookRenderer.setRendererMode(RendererMode.ACT) }
-        }
-        nativeRow.addView(nativeLabel)
-        nativeRow.addView(nativeJniBtn)
-        nativeRow.addView(nativeJnaBtn)
-
         bottomBar.addView(versionLabel)
-        bottomBar.addView(nativeRow)
 
         hookRenderer = HookRenderer(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -129,15 +101,28 @@ class MainActivity : AppCompatActivity() {
                     renderHook(currentHookPath)
                 }
             }
+
+            hookRenderer.onPostMessage = { data ->
+                val type = data["type"] as? String
+                if (type == "OPEN_REPO") {
+                    val url = data["url"] as? String
+                    if (url != null) {
+                        runOnUiThread {
+                            addRepoTab(url)
+                        }
+                    }
+                }
+            }
             
             // Update versions once ready
             val actVersion = "1.0.1"
             versionLabel.text = "Act: $actVersion | HookRenderer Ready"
             
-            updateNativeLabel(RendererMode.ANDROID)
-            
             // Default to home on startup
             renderHook("home.jsx")
+
+            // Load persisted repo tabs
+            loadRepoTabs()
         } catch (t: Throwable) {
             Log.e("MainActivity", "HookRenderer init failed", t)
             showError("Failed to initialize HookRenderer: ${t.message ?: "unknown error"}")
@@ -197,20 +182,51 @@ class MainActivity : AppCompatActivity() {
         tabContainer.addView(tabButton)
     }
 
+    private fun addRepoTab(url: String) {
+        if (repoTabs.containsKey(url)) {
+            renderHook("remote", mapOf("domain" to url))
+            return
+        }
+
+        val label = url.replace("https://", "").replace("http://", "").take(10) + "..."
+        val tabButton = Button(this).apply {
+            text = label
+            setOnClickListener { renderHook("remote", mapOf("domain" to url)) }
+        }
+        tabContainer.addView(tabButton)
+        repoTabs[url] = tabButton
+        
+        // Persist
+        val prefs = getSharedPreferences("relay_prefs", Context.MODE_PRIVATE)
+        val saved = prefs.getStringSet("repo_tabs", mutableSetOf()) ?: mutableSetOf()
+        val newSet = saved.toMutableSet()
+        newSet.add(url)
+        prefs.edit().putStringSet("repo_tabs", newSet).apply()
+
+        // Focus immediately
+        renderHook("remote", mapOf("domain" to url))
+    }
+
+    private fun loadRepoTabs() {
+        val prefs = getSharedPreferences("relay_prefs", Context.MODE_PRIVATE)
+        val saved = prefs.getStringSet("repo_tabs", emptySet()) ?: emptySet()
+        saved.forEach { url ->
+            val label = url.replace("https://", "").replace("http://", "").take(10) + "..."
+            val tabButton = Button(this).apply {
+                text = label
+                setOnClickListener { renderHook("remote", mapOf("domain" to url)) }
+            }
+            tabContainer.addView(tabButton)
+            repoTabs[url] = tabButton
+        }
+    }
+
     private fun addStatus(message: String) {
         Log.i("MainActivity", "Status: $message")
     }
 
     private fun showError(message: String) {
         Log.e("MainActivity", "Error: $message")
-    }
-
-    private fun updateNativeLabel(mode: RendererMode) {
-        val label = mode.name
-        nativeLabel.text = "Mode: $label"
-        val isAndroid = mode == RendererMode.ANDROID
-        nativeJniBtn.isEnabled = !isAndroid
-        nativeJnaBtn.isEnabled = isAndroid
     }
 
     override fun onDestroy() {

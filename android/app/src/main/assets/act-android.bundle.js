@@ -22,12 +22,17 @@
     function log(level, message) {
       try {
         const g2 = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : {};
-        const logger = g2.console && g2.console[level] ? g2.console[level] : null;
-        if (logger) {
-          logger(`[act] ${message}`);
+        const msg = `[act] ${message}`;
+        if (g2.console && typeof g2.console.log === "function") {
+          g2.console.log(msg);
         }
-        if (level === "error" && typeof g2.__log === "function") {
-          g2.__log("error", `[act] ${message}`);
+        if (typeof g2.__android_log === "function") {
+          g2.__android_log(level.toUpperCase(), msg);
+        } else if (g2.__android_log) {
+          try {
+            g2.__android_log(level.toUpperCase(), msg);
+          } catch (e) {
+          }
         }
       } catch (e) {
       }
@@ -40,7 +45,12 @@
       for (let i = 2; i < args.length; i++) {
         const child = args[i];
         if (Array.isArray(child)) {
-          out.push(...child);
+          for (let j = 0; j < child.length; j++) {
+            const c = child[j];
+            if (c !== void 0 && c !== null && c !== false) {
+              out.push(c);
+            }
+          }
         } else if (child !== void 0 && child !== null && child !== false) {
           out.push(child);
         }
@@ -48,11 +58,33 @@
       return out;
     }
     function createElement(type, props, ...childrenArgs) {
-      const children = flattenChildren([type, props, ...childrenArgs]);
       const p = props || {};
+      let children = flattenChildren([type, props, ...childrenArgs]);
+      const testId2 = p["test-id"] || p["testId"] || "";
+      if (children.length === 0 && p.children) {
+        log("info", `[createElement] ${type}${testId2 ? " (" + testId2 + ")" : ""}: Using p.children, isArray=${Array.isArray(p.children)}, type=${typeof p.children}`);
+        if (Array.isArray(p.children)) {
+          for (let i = 0; i < p.children.length; i++) {
+            const c = p.children[i];
+            if (Array.isArray(c)) {
+              log("info", `[createElement] ${type}: p.children[${i}] is nested array with ${c.length} items`);
+              for (let j = 0; j < c.length; j++) {
+                if (c[j] !== void 0 && c[j] !== null && c[j] !== false) {
+                  children.push(c[j]);
+                }
+              }
+            } else if (c !== void 0 && c !== null && c !== false) {
+              children.push(c);
+            }
+          }
+        } else {
+          children = [p.children];
+        }
+      }
       if (children.length > 0) {
         p.children = children.length === 1 ? children[0] : children;
       }
+      log("info", `[createElement] ${type}${testId2 ? " (" + testId2 + ")" : ""}: final children count=${children.length}`);
       return { type, props: p, children };
     }
     function resetTags() {
@@ -284,6 +316,9 @@
         }
       } else if (elements !== void 0 && elements !== null && elements !== false) {
         flatElements = [elements];
+      }
+      if (wipFiber.props && wipFiber.props["test-id"]) {
+        log("info", `Reconciling children for ${wipFiber.type} (${wipFiber.props["test-id"]}): ${flatElements.length} elements`);
       }
       while (index < flatElements.length || oldFiber != null) {
         let element = flatElements[index];
@@ -834,8 +869,12 @@
       const type = normalizeType(node.type);
       const tag = helpers.nextTag();
       const props = Object.assign({}, node.props || {});
+      const kids = node.children || [];
       const onClick = props.onClick;
+      const onChange = props.onChange || props.onInput;
       delete props.onClick;
+      delete props.onChange;
+      delete props.onInput;
       delete props.children;
       if (!props.width && parentTag === -1) props.width = "match_parent";
       if (!props.height && parentTag === -1) props.height = "match_parent";
@@ -843,11 +882,8 @@
       if (typeof onClick === "function") {
         nb.addEventListener(tag, "click", onClick);
       }
-      let kids = node.children || [];
-      if (node.props && node.props.children) {
-        if (kids.length === 0) {
-          kids = Array.isArray(node.props.children) ? node.props.children : [node.props.children];
-        }
+      if (typeof onChange === "function") {
+        nb.addEventListener(tag, "change", onChange);
       }
       const flatKids = [];
       for (let i = 0; i < kids.length; i++) {
@@ -858,6 +894,9 @@
         } else {
           flatKids.push(kids[i]);
         }
+      }
+      if (testId) {
+        helpers.log("info", `Node ${tag} (${type}) has ${flatKids.length} flat children`);
       }
       for (let i = 0; i < flatKids.length; i++) {
         mountNode(flatKids[i], tag, i, type, helpers.makePath(path, i), helpers);
@@ -902,6 +941,12 @@
         if (newProps.onClick !== oldProps.onClick) {
           if (typeof newProps.onClick === "function") {
             nb.addEventListener(instance.tag, "click", newProps.onClick);
+          }
+        }
+        if (newProps.onChange !== oldProps.onChange || newProps.onInput !== oldProps.onInput) {
+          const nextChange = newProps.onChange || newProps.onInput;
+          if (typeof nextChange === "function") {
+            nb.addEventListener(instance.tag, "change", nextChange);
           }
         }
       },
@@ -954,13 +999,24 @@
       StyleSheet,
       AppRegistry
     };
+    const jsx = (type, props, key) => {
+      const p = props || {};
+      console.log(`[ACT.jsx] type=${type}, key=${key}, props.children type=${typeof p.children}, isArray=${Array.isArray(p.children)}`);
+      if (Array.isArray(p.children)) {
+        console.log(`[ACT.jsx] children array length=${p.children.length}, first=${JSON.stringify(p.children[0])?.substring(0, 200)}`);
+      }
+      if (p.children !== void 0) {
+        return Act.createElement(type, p, p.children);
+      }
+      return Act.createElement(type, p);
+    };
     g.__hook_jsx_runtime = {
-      jsx: Act.createElement,
-      jsxs: Act.createElement,
+      jsx,
+      jsxs: jsx,
       Fragment: Act.Fragment
     };
-    g.__jsx = Act.createElement;
-    g.__jsxs = Act.createElement;
+    g.__jsx = jsx;
+    g.__jsxs = jsx;
     g.__Fragment = Act.Fragment;
   }
   var index_android_default = Act;

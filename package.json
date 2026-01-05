@@ -10,6 +10,8 @@
   "dependencies": {
     "@clevertree/act": "file:../act",
     "@clevertree/hook-transpiler": "file:../hook-transpiler",
-    "@clevertree/themed-styler": "file:../themed-styler"
+    "@clevertree/themed-styler": "file:../themed-styler",
+    "chokidar": "^5.0.0",
+    "ws": "^8.18.3"
   }
 }
