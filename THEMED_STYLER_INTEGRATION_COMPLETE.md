@@ -20,7 +20,7 @@ NativeRenderer.applyThemedStyles(view, type, className)
   ↓
 ThemedStylerModule.getRnStyles(type, ["bg-blue-500", "p-4"], {})  [JNI → Rust]
   ↓
-themed-styler parses classes → generates React Native style JSON
+themed-styler parses classes → generates Android/iOS Native style JSON
   ↓
 {"backgroundColor": "#3b82f6", "padding": 16.0}
   ↓
@@ -69,7 +69,7 @@ private fun applyThemedStyles(view: View, type: String, className: String) {
 ```
 
 **3. applyStyleMap() Function**
-Translates React Native-style JSON to Android View properties:
+Translates Android/iOS Native-style JSON to Android View properties:
 
 | RN Style Key | Android API | Example |
 |--------------|-------------|---------|
@@ -239,7 +239,7 @@ Currently not implemented in `applyStyleMap()`:
 
 The Android app can now:
 - Parse Tailwind-style className props
-- Translate them to React Native style JSON via Rust JNI
+- Translate them to Android/iOS Native style JSON via Rust JNI
 - Apply styles to native Android Views
 - Handle multiple view types (div, span, button)
 - Handle multiple style properties (backgroundColor, color, padding, fontSize, textAlign)

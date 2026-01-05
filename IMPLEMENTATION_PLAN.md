@@ -1,4 +1,4 @@
-# Relay Pure Android: Implementation Plan
+# Relay Android Client: Implementation Plan
 
 > Update (Dec 2025): QuickJS is the chosen on-device engine for Android. References to Hermes in this document remain for historical context and will be updated as the QuickJS bridge matures.
 
@@ -48,7 +48,7 @@ A fully functional Android application where:
 4. **Layout** is computed by themed-styler with native view properties (DP, padding, margin, flex)
 5. **Events** (clicks, touches, focus) are delegated through the native bridge back to React handlers
 6. **Remote hooks are lightweight** — only code and transpiled, not bundled libraries
-7. **No React Native overhead** — pure Rust + Kotlin + Hermes
+7. **No Android/iOS Native overhead** — pure Rust + Kotlin + Hermes
 
 ## High-Level Data Flow
 
@@ -228,7 +228,7 @@ fun createView(tag: Int, type: String, props: Map<String, Any>): View {
 
 **Call Flow**:
 ```kotlin
-// From NativeRenderer.applyStylesFromProps()
+// From AndroidRenderer.applyStylesFromProps()
 val className = props["className"] as? String ?: ""
 val classes = className.split(" ").filter { it.isNotEmpty() }
 val classesJson = Json.encode(classes)
@@ -869,9 +869,9 @@ React re-renders (goto "React renders")
 ## Key Assumptions
 
 1. **themed-styler** will be extended/adapted to output Android-friendly properties (DP values, native color ints, etc.)
-2. **Hermes** JSI setup can be done in C++ following React Native patterns
+2. **Hermes** JSI setup can be done in C++ following Android/iOS Native patterns
 3. **Kotlin** flexbox simulation is acceptable (not full CSS layout engine)
-4. **No third-party React libraries** needed (no react-native, no web libraries)
+4. **No third-party React libraries** needed (no android-ios-native, no web libraries)
 5. **start.jsx** is simple enough to run in standalone Hermes without module system
 
 ---

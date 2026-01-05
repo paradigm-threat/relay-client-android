@@ -15,7 +15,7 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ANDROID_NDK_HOME/toolchains/l
 ### Full Build & Deploy
 
 ```bash
-cd react-client-android
+cd relay-client-android
 # 1. Build Rust JNI libraries
 cd rust && cargo build --release --target aarch64-linux-android
 
@@ -28,8 +28,8 @@ cd ../android
 
 # 4. Launch and view logs
 adb logcat -c
-adb shell am force-stop com.relay.pure
-adb shell am start -n com.relay.pure/.MainActivity
+adb shell am force-stop com.relay.client
+adb shell am start -n com.relay.client/.MainActivity
 sleep 2
 adb logcat | grep -E "QuickJSManager|NativeRenderer|Rendering complete"
 ```
@@ -63,7 +63,7 @@ export ANDROID_NDK_HOME="$HOME/Android/Sdk/ndk/27.0.12077973"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
 
 # Clean and rebuild
-cd react-client-android/rust
+cd relay-client-android/rust
 cargo clean
 cargo build --release --target aarch64-linux-android
 ```
@@ -82,7 +82,7 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ANDROID_NDK_HOME/toolchains/l
 **Symptom**:
 ```
 AndroidRuntime: java.lang.UnsatisfiedLinkError: No implementation found for 
-java.lang.String com.relay.pure.ThemedStylerModule.nativeGetAndroidStyles(...)
+java.lang.String com.relay.client.ThemedStylerModule.nativeGetAndroidStyles(...)
 ```
 
 App crashes on startup when trying to style the first view.
@@ -96,7 +96,7 @@ App crashes on startup when trying to style the first view.
 
 ```bash
 # 1. Verify symbol exists in compiled library
-strings react-client-android/rust/target/aarch64-linux-android/release/libandroid_jni.so | \
+strings relay-client-android/rust/target/aarch64-linux-android/release/libandroid_jni.so | \
   grep Java_com_relay_pure_ThemedStylerModule_nativeGetAndroidStyles
 
 # Output should show:
@@ -104,22 +104,22 @@ strings react-client-android/rust/target/aarch64-linux-android/release/libandroi
 # (appears twice - one for each calling convention)
 
 # 2. Copy the .so files (all three)
-cp react-client-android/rust/target/aarch64-linux-android/release/libandroid_jni.so \
-   react-client-android/android/app/src/main/jniLibs/arm64-v8a/
+cp relay-client-android/rust/target/aarch64-linux-android/release/libandroid_jni.so \
+   relay-client-android/android/app/src/main/jniLibs/arm64-v8a/
 
-cp react-client-android/rust/target/aarch64-linux-android/release/librelay_hook_transpiler.so \
-   react-client-android/android/app/src/main/jniLibs/arm64-v8a/
+cp relay-client-android/rust/target/aarch64-linux-android/release/librelay_hook_transpiler.so \
+   relay-client-android/android/app/src/main/jniLibs/arm64-v8a/
 
-cp react-client-android/rust/target/aarch64-linux-android/release/libthemed_styler.so \
-   react-client-android/android/app/src/main/jniLibs/arm64-v8a/
+cp relay-client-android/rust/target/aarch64-linux-android/release/libthemed_styler.so \
+   relay-client-android/android/app/src/main/jniLibs/arm64-v8a/
 
 # 3. Verify files are in jniLibs
-ls -lh react-client-android/android/app/src/main/jniLibs/arm64-v8a/
+ls -lh relay-client-android/android/app/src/main/jniLibs/arm64-v8a/
 
 # Should show all three .so files, each > 1MB
 
 # 4. Rebuild APK
-cd react-client-android/android
+cd relay-client-android/android
 ./gradlew clean assembleDebug
 ./gradlew installDebug
 
@@ -187,17 +187,17 @@ cargo build --release --target aarch64-linux-android
 
 ```bash
 # 1. Clear all state
-adb shell am force-stop com.relay.pure
-adb shell rm -rf /data/data/com.relay.pure
+adb shell am force-stop com.relay.client
+adb shell rm -rf /data/data/com.relay.client
 
 # 2. Reinstall APK
-cd react-client-android/android
+cd relay-client-android/android
 ./gradlew uninstallAll
 ./gradlew installDebug
 
 # 3. Monitor startup
 adb logcat -c
-adb shell am start -n com.relay.pure/.MainActivity
+adb shell am start -n com.relay.client/.MainActivity
 sleep 1
 
 # 4. Check for crashes
@@ -233,7 +233,7 @@ adb logcat -d | grep "applyThemedStyles" | head -5
 # E: styles: { padding: 16, backgroundColor: "#3b82f6", width: "match_parent" }
 
 # 2. If missing width, update themed-styler logic
-# Edit react-client-android/rust/client-core/src/lib.rs
+# Edit relay-client-android/rust/client-core/src/lib.rs
 # Function: get_android_styles()
 # Add: styles.insert("width", "match_parent") for divs
 
@@ -255,7 +255,7 @@ adb exec-out screencap -p > ui-test.png
 **Solution**:
 ```bash
 # 1. Full clean of Rust build artifacts
-cd react-client-android/rust
+cd relay-client-android/rust
 cargo clean
 rm -rf target/
 
@@ -286,7 +286,7 @@ cd ../android
   ls -lh android/app/src/main/jniLibs/arm64-v8a/lib*.so  # Should show 3 files
   ```
 - [ ] APK installs without errors: `./gradlew installDebug`
-- [ ] App launches: `adb shell am start -n com.relay.pure/.MainActivity`
+- [ ] App launches: `adb shell am start -n com.relay.client/.MainActivity`
 - [ ] Logcat shows no `UnsatisfiedLinkError`: `adb logcat | grep UnsatisfiedLink`
 - [ ] Logcat shows `[JS] Rendering complete!`: `adb logcat | grep "Rendering complete"`
 

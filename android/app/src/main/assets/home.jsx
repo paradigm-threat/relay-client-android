@@ -1,31 +1,35 @@
-function Home() {
-    const versions = globalThis.__versions || {};
-    const tVer = versions.transpiler || 'unknown';
-    const sVer = versions.styler || 'unknown';
+export default function Home() {
+    const appVersion = (globalThis.__appVersion) || '1.0.0';
 
-    return (
-        <div className="flex-1 bg-gray-100 w-full h-full p-4" width="match_parent" height="match_parent">
-            <div className="bg-blue-500 p-4 w-full" width="match_parent" height="wrap_content">
-                <span className="text-white text-lg text-center" width="wrap_content" height="wrap_content">
-                    Relay Pure Client
-                </span>
-            </div>
+    const peers = [
+        { host: 'https://node-dfw1.relaynet.online', note: 'Default peer (DFW1)' },
+        { host: 'https://node-dfw2.relaynet.online', note: 'Default peer (DFW2)' }
+    ];
 
-            <div className="p-4 w-full" width="match_parent" height="wrap_content">
-                <span className="text-green-500 p-2" width="wrap_content" height="wrap_content">✓ QuickJS Runtime</span>
-                <span className="text-green-500 p-2" width="wrap_content" height="wrap_content">✓ Hook Transpiler v{tVer}</span>
-                <span className="text-green-500 p-2" width="wrap_content" height="wrap_content">✓ Themed Styler v{sVer}</span>
-            </div>
-
-            <div className="p-4 w-full" width="match_parent" height="wrap_content">
-                <div className="bg-white p-4 rounded shadow" width="match_parent" height="wrap_content">
-                    <span className="text-gray-800" width="wrap_content" height="wrap_content">
-                        Welcome to Relay Pure Android.
-                    </span>
-                </div>
-            </div>
+    return <body>
+        <div className="bg-primary p-4 mb-4 w-full">
+            <h1 className="text-white">Relay Peers</h1>
         </div>
-    );
-}
 
-module.exports = Home;
+        <div className="p-4 rounded shadow mb-4 w-full">
+            <span>Manage your Relay peers. This screen is simplified to match the working settings view.</span>
+        </div>
+
+        <div className="p-4 rounded border-themed w-full">
+            <div className="mb-2 w-full">
+                <h2 className="mb-2">Default peers</h2>
+            </div>
+            {peers.map(peer => (
+                <div key={peer.host} className="p-3 mb-2 rounded border-themed w-full">
+                    <span className="font-semibold">{peer.host}</span>
+                    <span className="text-muted">{peer.note}</span>
+                    <span className="text-xs mt-1 px-2 py-1 rounded bg-surface text-muted">Status: Not probed</span>
+                </div>
+            ))}
+        </div>
+
+        <div className="absolute bottom-0 right-0 p-2 bg-opacity-75 rounded-tl">
+            <span className="text-xs">v{appVersion}</span>
+        </div>
+    </body>;
+}

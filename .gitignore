@@ -1,3 +1,5 @@
+node_modules
+
 # Gradle files
 .gradle/
 build/
@@ -33,3 +35,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Native libs copied from @clevertree packages
+android/app/src/main/jniLibs/
+android/local-maven

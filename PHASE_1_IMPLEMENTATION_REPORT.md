@@ -185,7 +185,7 @@ Android View hierarchy
 
 ### Build Command
 ```bash
-cd react-client-android/android
+cd relay-client-android/android
 ./gradlew clean assembleDebug
 ```
 
@@ -213,7 +213,7 @@ cd react-client-android/android
 - [ ] USB debugging enabled (for device)
 - [ ] Build: `./gradlew assembleDebug`
 - [ ] Install: `adb install -r app/build/outputs/apk/debug/app-debug.apk`
-- [ ] Launch: `adb shell am start -n com.relay.pure/com.relay.pure.MainActivity`
+- [ ] Launch: `adb shell am start -n com.relay.client/com.relay.client.MainActivity`
 - [ ] Verify: "Hello from Hermes!" appears
 
 ---
@@ -253,7 +253,7 @@ Phase 1 Foundation is complete and tested-ready. Next steps:
 
 ## 📚 Documentation
 
-All documentation is in `/react-client-android/`:
+All documentation is in `/relay-client-android/`:
 
 - `PHASE_1_COMPLETE.md` - What was built
 - `BUILD_AND_TEST.md` - How to build and test

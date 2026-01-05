@@ -1,47 +1,37 @@
-function Settings() {
-    const runtime = (globalThis.__runtime && globalThis.__runtime.mode) || 'react';
+import { setCurrentTheme, getThemeList, getThemes } from '@clevertree/themed-styler';
 
-    const setRuntime = (mode) => {
-        if (mode === runtime) {
-            console.log('Runtime already set to', mode);
-            return;
-        }
-        if (typeof globalThis.__nativeSetRuntime === 'function') {
-            globalThis.__nativeSetRuntime(mode);
-        } else {
-            console.warn('Runtime switch is not available');
-        }
-    };
+export default function Settings() {
+    const themes = getThemes() || {};
+    const availableThemes = getThemeList() || [];
+    const currentTheme = themes.currentTheme || 'default';
 
     return (
-        <div className="p-4" width="match_parent" height="wrap_content">
-            <div className="bg-blue-500 p-4" width="match_parent" height="wrap_content">
-                <span className="text-white lg">Settings</span>
+        <body>
+            <div className="bg-primary p-4 w-full">
+                <h1 className="text-white">Settings</h1>
             </div>
 
-            <div className="p-4" width="match_parent" height="wrap_content">
-                <span className="text-gray-800" width="wrap_content" height="wrap_content">
-                    Choose a runtime. If a screen looks off, try the other option.
-                </span>
-            </div>
-
-            <div className="p-4" width="match_parent" height="wrap_content">
-                <div className="bg-white p-4 rounded shadow" width="match_parent" height="wrap_content">
-                    <span className="text-gray-800" width="wrap_content" height="wrap_content">
-                        Active runtime: {runtime.toUpperCase()}
+            <div className="p-4 w-full">
+                <div className="p-4 rounded shadow w-full">
+                    <h2 className="mb-2">Theme</h2>
+                    <span>
+                        Active: {currentTheme}
                     </span>
-                    <div className="p-2" width="match_parent" height="wrap_content">
-                        <button className="bg-blue-500 text-white p-2 m-2" width="wrap_content" height="wrap_content" onClick={() => setRuntime('react')}>
-                            Switch to React
-                        </button>
-                        <button className="bg-green-500 text-white p-2 m-2" width="wrap_content" height="wrap_content" onClick={() => setRuntime('act')}>
-                            Switch to Act (lightweight)
-                        </button>
+                    <div className="p-2 w-full">
+                        <select
+                            className="p-2 w-full rounded bg-surface border-themed"
+                            value={currentTheme}
+                            onChange={(e) => setCurrentTheme(e.value)}
+                        >
+                            {availableThemes.map(themeObj => (
+                                <option key={themeObj.key} value={themeObj.key}>
+                                    {themeObj.key}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
             </div>
-        </div>
+        </body>
     );
 }
-
-module.exports = Settings;

@@ -231,7 +231,7 @@ Once all components migrated:
 ## File Structure
 
 ```
-react-client-android/
+relay-client-android/
 ├── act/                          # New act library
 │   ├── src/
 │   │   ├── index.js              # Main entry point
@@ -438,7 +438,7 @@ describe('act.useState', () => {
 
 ## Next Steps (Immediate)
 
-1. Create `react-client-android/act/` directory structure
+1. Create `relay-client-android/act/` directory structure
 2. Implement `createElement()` and basic VNode
 3. Wire up to nativeBridge in proof-of-concept
 4. Test with simple `<div>Hello</div>` component

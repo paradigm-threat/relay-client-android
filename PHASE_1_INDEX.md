@@ -45,7 +45,7 @@
 ## 🗂️ Source Code Structure
 
 ```
-react-client-android/
+relay-client-android/
 ├── android/                          # Android Gradle project
 │   ├── app/
 │   │   ├── CMakeLists.txt           # ✅ NEW - Native build config
@@ -106,14 +106,14 @@ react-client-android/
 
 ```bash
 # 1. Build
-cd /home/ari/dev/react-client-android/android
+cd /home/ari/dev/relay-client-android/android
 ./gradlew clean assembleDebug
 
 # 2. Deploy
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 3. Run
-adb shell am start -n com.relay.pure/com.relay.pure.MainActivity
+adb shell am start -n com.relay.client/com.relay.client.MainActivity
 
 # 4. Verify (expected: "Hello from Hermes!" on white screen)
 adb logcat | grep HermesManager
@@ -200,7 +200,7 @@ MainActivity creates:
 
 ## 🔧 Key Technologies
 
-- **Hermes**: JavaScript runtime optimized for React Native
+- **Hermes**: JavaScript runtime optimized for Android/iOS Native
 - **JSI**: JavaScript Interface for Kotlin ↔ JS communication
 - **JNI**: Java Native Interface for C++ integration
 - **CMake**: Build native libraries

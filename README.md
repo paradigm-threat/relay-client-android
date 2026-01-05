@@ -1,12 +1,12 @@
-# Relay Pure Android Client
+# <img src="android/app/src/main/assets/icon.png" width="32" height="32" align="center" /> Relay Android Client
 
-A cross-platform Android application built entirely without React Native, using **hook-transpiler** and **themed-styler** as the core rendering system. This architecture provides true React-to-Native compilation while maintaining multi-OS UI consistency.
+A cross-platform Android application built entirely without Android/iOS Native, using **hook-transpiler** and **themed-styler** as the core rendering system. This architecture provides true React-to-Native compilation while maintaining multi-OS UI consistency.
 
 ## Core Architecture: Hook-Transpiler (Android) + Themed-Styler + Host-Bundled React
 
 ### The Problem We Solved
 
-React Native introduced unnecessary complexity—heavy bridging, slow loading, platform inconsistencies, and maintenance headaches. Instead, we use a **compile-once, render-native** approach where:
+Android/iOS Native introduced unnecessary complexity—heavy bridging, slow loading, platform inconsistencies, and maintenance headaches. Instead, we use a **compile-once, render-native** approach where:
 
 1. **Host app bundles React once** (in APK)
 2. **JSX hooks are transpiled on-device** (only code, no libraries)
@@ -161,7 +161,7 @@ export default function Counter() {
 ## Project Structure
 
 ```
-react-client-android/
+relay-client-android/
 ├── android/                           # Android Gradle project
 │   ├── app/
 │   │   ├── src/main/

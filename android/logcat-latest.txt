@@ -22,12 +22,12 @@
 12-20 11:41:08.884   463   463 V thermal_src: waiting NOTIFY from kernel miss, -1
 12-20 11:41:12.498   459   459 I thermal_repeater: socket -1
 12-20 11:41:13.876   635   728 I chatty  : uid=1000(system) WifiStateMachin expire 1 line
-12-20 11:41:15.302   635   652 I ActivityManager: Force stopping com.relay.pure appid=10264 user=-1: installPackageLI
-12-20 11:41:15.302   635   652 I ActivityManager: Killing 15243:com.relay.pure/u0a264 (adj 0): stop com.relay.pure
-12-20 11:41:15.304   635   652 W ActivityManager: Force removing ActivityRecord{15b544a u0 com.relay.pure/.MainActivity t1548}: app died, no saved state
+12-20 11:41:15.302   635   652 I ActivityManager: Force stopping com.relay.client appid=10264 user=-1: installPackageLI
+12-20 11:41:15.302   635   652 I ActivityManager: Killing 15243:com.relay.client/u0a264 (adj 0): stop com.relay.client
+12-20 11:41:15.304   635   652 W ActivityManager: Force removing ActivityRecord{15b544a u0 com.relay.client/.MainActivity t1548}: app died, no saved state
 12-20 11:41:15.349   348   348 I Zygote  : Process 15243 exited due to signal (9)
-12-20 11:41:15.427   635   666 I PackageManager: Update package com.relay.pure code path from /data/app/com.relay.pure-EyKc0SXY-MJUd8_5UFWT2w== to /data/app/com.relay.pure-t01ygt622axfcoQlnxK2AQ==; Retain data and using new
-12-20 11:41:15.427   635   666 I PackageManager: Update package com.relay.pure resource path from /data/app/com.relay.pure-EyKc0SXY-MJUd8_5UFWT2w== to /data/app/com.relay.pure-t01ygt622axfcoQlnxK2AQ==; Retain data and using new
+12-20 11:41:15.427   635   666 I PackageManager: Update package com.relay.client code path from /data/app/com.relay.client-EyKc0SXY-MJUd8_5UFWT2w== to /data/app/com.relay.client-t01ygt622axfcoQlnxK2AQ==; Retain data and using new
+12-20 11:41:15.427   635   666 I PackageManager: Update package com.relay.client resource path from /data/app/com.relay.client-EyKc0SXY-MJUd8_5UFWT2w== to /data/app/com.relay.client-t01ygt622axfcoQlnxK2AQ==; Retain data and using new
 12-20 11:41:15.431   635   652 I chatty  : uid=1000(system) ActivityManager expire 1 line
 12-20 11:41:15.443   635   653 W Looper  : Slow dispatch took 141ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=null m=53
 12-20 11:41:15.444   635   666 I chatty  : uid=1000(system) PackageManager expire 133 lines
@@ -43,12 +43,12 @@
 12-20 11:41:15.642   635   666 I AmzPkgMgrCallback: Deferring resource clean-up
 12-20 11:41:15.642   433 31533 E         : Couldn't opendir /data/app/vmdl1623386809.tmp: No such file or directory
 12-20 11:41:15.642   433 31533 E installd: Failed to delete /data/app/vmdl1623386809.tmp: No such file or directory
-12-20 11:41:15.643   635   666 I com.android.server.pm.ExternalInstallPackageManagerCallback: Installation succeeded for app com.relay.pure on internal storage. Return code:1
-12-20 11:41:15.648   635   666 I ActivityManager: Force stopping com.relay.pure appid=10264 user=0: pkg removed
+12-20 11:41:15.643   635   666 I com.android.server.pm.ExternalInstallPackageManagerCallback: Installation succeeded for app com.relay.client on internal storage. Return code:1
+12-20 11:41:15.648   635   666 I ActivityManager: Force stopping com.relay.client appid=10264 user=0: pkg removed
 12-20 11:41:15.650   635   772 E SELinux : avc:  denied  { log_internal_metric } for  scontext=u:r:untrusted_app_25:s0:c512,c768 tcontext=u:r:system_server:s0 tclass=amazon_policies permissive=0
 12-20 11:41:15.663   635   772 W AmazonProfileService: Active profile for the package xxx not present for customer Id xxx
 12-20 11:41:15.666  1479  1479 I SALE_SaleService: PackageStatusReceiver onReceive
-12-20 11:41:15.668  1479  2937 I SALE_SaleService: PackageStatusReceiver: package removed : com.relay.pure isReplacing : true
+12-20 11:41:15.668  1479  2937 I SALE_SaleService: PackageStatusReceiver: package removed : com.relay.client isReplacing : true
 12-20 11:41:15.669   635   652 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED (has data) flg=0x4000010 (has extras) } to com.amazon.diode/.analyzer.PackageEventReceiver
 12-20 11:41:15.675   635   653 W Looper  : Slow dispatch took 232ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=null m=31
 12-20 11:41:15.675   635   653 W Looper  : Slow delivery took 240ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=null m=30
@@ -60,9 +60,9 @@
 12-20 11:41:15.688 20222 20222 D com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver.PII: LWA onReceive : action=android.intent.action.PACKAGE_REMOVED, isReplacing= true data=:<obscured>
 12-20 11:41:15.688  1479  1479 I SALE_SaleService: PackageStatusReceiver onReceive
 12-20 11:41:15.688 20222 20222 I com.amazon.identity.auth.device.authorization.appsync.PackageChangedReceiver: LWA onRecieve : Package is being replaced, will leave this to ACTION_PACKAGE_REPLACED receiver
-12-20 11:41:15.696  9290  9290 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.relay.pure]
+12-20 11:41:15.696  9290  9290 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.relay.client]
 12-20 11:41:15.697  9290  9290 I Finsky  : [2] AIM: AppInfoManager-Perf > getApps > called for 1 apps
-12-20 11:41:15.698  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.relay.pure]
+12-20 11:41:15.698  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.relay.client]
 12-20 11:41:15.698   635   660 W ActivityManager: setHasOverlayUi called on unknown pid: 15243
 12-20 11:41:15.701 18927 18946 I ContentSyncFramework: Got Intent android.intent.action.PACKAGE_REPLACED
 12-20 11:41:15.702   635   660 E AmazonProfileService: Active profile has not been set
@@ -89,7 +89,7 @@
 12-20 11:41:15.708   635  3657 V IntentResolver: Final result list:
 12-20 11:41:15.709  1312  1312 D DeviceCapabilityServer-AppChangeTrigger: onReceive: android.intent.action.PACKAGE_REMOVED
 12-20 11:41:15.709  1312  1312 D DeviceCapabilityServer-DeviceCapabilityTrigger: publishCapabilities force (false) token (b3db668c-6cf1-4c9e-8d46-9e8f2b64fb91) client (null)
-12-20 11:41:15.712  1479  2937 I SALE_SaleService: PackageStatusReceiver: package added: com.relay.pure
+12-20 11:41:15.712  1479  2937 I SALE_SaleService: PackageStatusReceiver: package added: com.relay.client
 12-20 11:41:15.716  9290  9290 I Finsky  : [2] ahmo - Received: android.intent.action.PACKAGE_ADDED, [m-IzUI3Ppiii2emxMknHt6uFica8dyvx3CiYpkno5lM]
 12-20 11:41:15.716  9290  9335 I Finsky  : [1401] AIM: Got app ownership map. App counts: . Unique apps: 0
 12-20 11:41:15.716  9290  9335 E Finsky  : [1401] [Counters] attempted to use a non-positive increment for: 4752
@@ -102,12 +102,12 @@
 12-20 11:41:15.736  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4753
 12-20 11:41:15.742  9290  9316 I android.vendin: Waiting for a blocking GC ProfileSaver
 12-20 11:41:15.743  9290 16171 I Finsky  : [1749] SCH: Received scheduling request: Id: 12-1, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
-12-20 11:41:15.746 15355 15355 I Finsky:background: [2] IQ: onPackageRemoved com.relay.pure, replacing=true, uninstallingFromPlay=false
+12-20 11:41:15.746 15355 15355 I Finsky:background: [2] IQ: onPackageRemoved com.relay.client, replacing=true, uninstallingFromPlay=false
 12-20 11:41:15.748 15355 15355 I Finsky:background: [2] ahme - Received: android.intent.action.PACKAGE_ADDED, [m-IzUI3Ppiii2emxMknHt6uFica8dyvx3CiYpkno5lM]
 12-20 11:41:15.751  9290  9290 I Finsky  : [2] DTU: Received onPackageAdded, replacing: true
-12-20 11:41:15.753  9290  9290 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.relay.pure]
+12-20 11:41:15.753  9290  9290 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.relay.client]
 12-20 11:41:15.753  9290  9290 I Finsky  : [2] AIM: AppInfoManager-Perf > getApps > called for 1 apps
-12-20 11:41:15.754  9290  9342 I Finsky  : [1407] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.relay.pure]
+12-20 11:41:15.754  9290  9342 I Finsky  : [1407] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.relay.client]
 12-20 11:41:15.754 18927 18946 I ContentSyncFramework: Job with id 3 schedule status is 1: 
 12-20 11:41:15.754  9290  9342 I Finsky  : [1407] AIM: Got app ownership map. App counts: . Unique apps: 0
 12-20 11:41:15.755  9290  9342 E Finsky  : [1407] [Counters] attempted to use a non-positive increment for: 4752
@@ -184,7 +184,7 @@
 12-20 11:41:15.897 20222 16207 I com.amazon.identity.auth.device.utils.ThirdPartyResourceParser: Attempting to parse API Key from meta data in Android manifest
 12-20 11:41:15.897 20222 16207 D com.amazon.identity.auth.device.appid.APIKeyDecoder.PII: Begin decoding API Key for packageName=:<obscured>
 12-20 11:41:15.897 20222 16207 D com.amazon.identity.auth.device.appid.APIKeyDecoder.PII: APIKey:<obscured>
-12-20 11:41:15.897 20222 16207 W com.amazon.identity.auth.device.appid.APIKeyDecoder: Unable to decode APIKey for pkg=com.relay.pure
+12-20 11:41:15.897 20222 16207 W com.amazon.identity.auth.device.appid.APIKeyDecoder: Unable to decode APIKey for pkg=com.relay.client
 12-20 11:41:15.906 15355 16176 I Finsky:background: [1621] Wrote row to frosting DB: 35858
 12-20 11:41:15.929  9290  9335 I Finsky  : [1401] AIM: AppInfoManager-Perf > ItemModel > CacheSize=82, cacheHitCount=0, cacheMissCount=0, total appsWithNoServerDataCount=3. Missed  in cache (limit 10) : []
 12-20 11:41:15.941   635   635 W Looper  : Slow dispatch took 217ms main h=android.app.ActivityThread$H c=android.app.-$$Lambda$LoadedApk$ReceiverDispatcher$Args$_BumDX2UKsnxLVrE6UJsJZkotuA@f66050e m=0
@@ -259,7 +259,7 @@
 12-20 11:41:16.318   635   651 W GeofenceProxy: Odd, no component found for service com.android.location.service.GeofenceProvider
 12-20 11:41:16.319   635   651 W ActivityRecognitionProxy: com.google.android.gms resolves service com.android.location.service.ActivityRecognitionProvider, but has wrong signature, ignoring
 12-20 11:41:16.319   635   651 W ActivityRecognitionProxy: Odd, no component found for service com.android.location.service.ActivityRecognitionProvider
-12-20 11:41:16.319   635   651 I PackageRecency: Package com.relay.pure has changed
+12-20 11:41:16.319   635   651 I PackageRecency: Package com.relay.client has changed
 12-20 11:41:16.319   635   651 W PackageRecency: No listeners found
 12-20 11:41:16.412   635   654 I ActivityManager: Start proc 16218:com.android.providers.calendar/u0a97 for content provider com.android.providers.calendar/.CalendarProvider2
 12-20 11:41:16.419 16218 16218 E viders.calenda: Not starting debugger since process cannot load the jdwp agent.

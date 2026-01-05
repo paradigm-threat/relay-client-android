@@ -94,7 +94,7 @@ All Phase 1 components implemented and verified.
 
 ### Build Command
 ```bash
-cd /home/ari/dev/react-client-android/android
+cd /home/ari/dev/relay-client-android/android
 ./gradlew clean assembleDebug
 ```
 
@@ -106,7 +106,7 @@ cd /home/ari/dev/react-client-android/android
 ### Deployment
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.relay.pure/com.relay.pure.MainActivity
+adb shell am start -n com.relay.client/com.relay.client.MainActivity
 ```
 
 ### Verification

@@ -42,7 +42,7 @@
     // Header title
     const titleTag = 2;
     const titleProps = {
-        text: 'Relay Pure Client',
+        text: 'Relay Client',
         className: 'text-white text-lg text-center',
         width: 'wrap_content',
         height: 'wrap_content'

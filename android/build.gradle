@@ -1,4 +1,7 @@
 buildscript {
+    ext {
+        minSdkVersion = 29
+    }
     repositories {
         google()
         mavenCentral()
@@ -6,6 +9,21 @@ buildscript {
     dependencies {
            classpath 'com.android.tools.build:gradle:8.1.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.21"
+    }
+}
+
+allprojects {
+    repositories {
+        mavenLocal()
+        maven {
+            url "$rootDir/local-maven"
+        }
+        google()
+        mavenCentral()
+        maven {
+            // React Native JSC
+            url 'https://jitpack.io'
+        }
     }
 }
 

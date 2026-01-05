@@ -174,8 +174,8 @@ adb exec-out screencap -p > ui-layout.png
 adb logcat -d | grep -E "applyStyleMap|Setting width|Setting height"
 
 # Should show dimension parsing:
-# D NativeRenderer: Setting width: value=100%, parsed=-1, MATCH_PARENT=-1
-# D NativeRenderer: Setting height: value=wrap_content, parsed=-2
+# D AndroidRenderer: Setting width: value=100%, parsed=-1, MATCH_PARENT=-1
+# D AndroidRenderer: Setting height: value=wrap_content, parsed=-2
 ```
 
 ### Programmatic Verification

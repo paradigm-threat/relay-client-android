@@ -1,0 +1,15 @@
+{
+  "name": "relay-client-android",
+  "version": "1.0.0",
+  "description": "Android client for React/Act UI",
+  "scripts": {
+    "postinstall": "mkdir -p android/app/src/main/assets && mkdir -p android/app/src/main/jniLibs && npm run copy-jni && npm run copy-act",
+    "copy-jni": "cp -r node_modules/@clevertree/hook-transpiler/android/jniLibs/* android/app/src/main/jniLibs/ && cp -r node_modules/@clevertree/themed-styler/android/jniLibs/* android/app/src/main/jniLibs/",
+    "copy-act": "cp node_modules/@clevertree/act/dist/act-android.bundle.js android/app/src/main/assets/"
+  },
+  "dependencies": {
+    "@clevertree/act": "file:../act",
+    "@clevertree/hook-transpiler": "file:../hook-transpiler",
+    "@clevertree/themed-styler": "file:../themed-styler"
+  }
+}

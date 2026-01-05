@@ -1,7 +1,7 @@
-# Plan: Pure Android Relay Client (Without React Native)
+# Plan: Pure Android Relay Client (Without Android/iOS Native)
 
 ## 1. Overview
-The goal is to create a new Android repository for a pure Android application that renders its UI using React, transpiled on-the-fly via the `hook-transpiler` Rust crate, and styled using `themed-styler`. This architecture avoids the React Native framework while providing a similar "React-to-Native" experience.
+The goal is to create a new Android repository for a pure Android application that renders its UI using React, transpiled on-the-fly via the `hook-transpiler` Rust crate, and styled using `themed-styler`. This architecture avoids the Android/iOS Native framework while providing a similar "React-to-Native" experience.
 
 ## 2. Core Architecture
 - **Language**: Kotlin for the native shell, Rust for performance-critical transpilation and styling logic.
@@ -14,14 +14,14 @@ The goal is to create a new Android repository for a pure Android application th
 
 ### 3.1 hook-transpiler
 - **Strategy**: Leverage the existing JNI bindings in `hook-transpiler/src/android_jni.rs`.
-- **Package Update**: Update JNI method signatures to match the new app's package name (e.g., `com.relay.pure.RustTranspilerModule`).
+- **Package Update**: Update JNI method signatures to match the new app's package name (e.g., `com.relay.client.RustTranspilerModule`).
 - **JS Integration**: Expose `nativeTranspile` to the QuickJS runtime as a global function (e.g., `globalThis.__hook_transpile_jsx`).
 
 ### 3.2 themed-styler
 - **Changes Needed**:
     - **Android Style Support**: Extend the Rust logic to provide style objects optimized for Android's View system (e.g., handling DP vs PX, Android-specific color formats).
     - **Native Style Applier**: In Kotlin, implement a `StyleApplier` that takes the JSON output from `themed-styler` and calls native View methods (`setBackgroundColor`, `setPadding`, `setElevation` for shadows, etc.).
-    - **Direct Styling**: Remove dependencies on React Native's `StyleSheet` and instead use a direct mapping from `themed-styler` classes to View properties.
+    - **Direct Styling**: Remove dependencies on Android/iOS Native's `StyleSheet` and instead use a direct mapping from `themed-styler` classes to View properties.
 
 ### 3.3 Hook Renderer & JSX Bundling
 - **Start File**: A bundled `start.jsx` in the APK's `assets/` directory will serve as the entry point.

@@ -31,7 +31,7 @@ ls $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/
 ### Option 1: Build with Gradle (Recommended)
 
 ```bash
-cd /home/ari/dev/react-client-android/android
+cd /home/ari/dev/relay-client-android/android
 
 # Clean build
 ./gradlew clean
@@ -45,7 +45,7 @@ cd /home/ari/dev/react-client-android/android
 ### Option 2: Build from Command Line (Advanced)
 
 ```bash
-cd /home/ari/dev/react-client-android/android
+cd /home/ari/dev/relay-client-android/android
 
 # Build with explicit NDK path
 ./gradlew assembleDebug \
@@ -59,7 +59,7 @@ echo "android.ndkVersion=25.1.8937393" >> app/gradle.properties
 ### Option 3: Build Release APK
 
 ```bash
-cd /home/ari/dev/react-client-android/android
+cd /home/ari/dev/relay-client-android/android
 
 ./gradlew assembleRelease
 
@@ -86,7 +86,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r -f app/build/outputs/apk/debug/app-debug.apk
 
 # Launch app
-adb shell am start -n com.relay.pure/com.relay.pure.MainActivity
+adb shell am start -n com.relay.client/com.relay.client.MainActivity
 
 # View real-time logs
 adb logcat | grep -E "HermesManager|NativeRenderer|RelayJSI|start\.jsx"
@@ -97,7 +97,7 @@ adb logcat > app.log &
 # Clear previous logs and start fresh
 adb logcat -c
 adb logcat > app.log &
-adb shell am start -n com.relay.pure/com.relay.pure.MainActivity
+adb shell am start -n com.relay.client/com.relay.client.MainActivity
 sleep 5
 kill %1  # Stop logcat
 cat app.log
@@ -164,7 +164,7 @@ grep "react-android\|react-core" android/app/build.gradle
 
 # Error: "INSTALL_FAILED_VERSION_DOWNGRADE"
 # Solution: Uninstall previous version first
-adb uninstall com.relay.pure
+adb uninstall com.relay.client
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -190,7 +190,7 @@ adb logcat | grep -A 5 "FATAL\|CRASH\|Exception"
 3. **"start.jsx not found"**
    - Cause: Asset file missing
    - Fix: Ensure `android/app/src/main/assets/start.jsx` exists
-   - Check: `adb shell ls -la /data/app/com.relay.pure-*/base/assets/`
+   - Check: `adb shell ls -la /data/app/com.relay.client-*/base/assets/`
 
 4. **"nativeBridge not available"**
    - Cause: JSI bridge setup failed
@@ -238,7 +238,7 @@ Phase 1 is complete when:
 
 Once Phase 1 is verified:
 
-1. Run: `cd /home/ari/dev && ./gradlew assembleDebug -p react-client-android/android`
+1. Run: `cd /home/ari/dev && ./gradlew assembleDebug -p relay-client-android/android`
 2. Test on tablet: Connect tablet and install APK
 3. Verify rendering on larger screen (responsive behavior)
 4. Proceed to Phase 2: Styling System

@@ -39,7 +39,7 @@ ls -la "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linu
 ### Build Rust Components
 
 ```bash
-cd react-client-android/rust
+cd relay-client-android/rust
 
 # Clean previous builds (recommended)
 cargo clean
@@ -85,7 +85,7 @@ cp target/aarch64-linux-android/release/libthemed_styler.so \
 ### Build Steps
 
 ```bash
-cd react-client-android/android
+cd relay-client-android/android
 
 # Full clean build
 ./gradlew clean assembleDebug
@@ -129,10 +129,10 @@ cd react-client-android/android
 adb logcat -c
 
 # Force-stop previous instance
-adb shell am force-stop com.relay.pure
+adb shell am force-stop com.relay.client
 
 # Launch app
-adb shell am start -n com.relay.pure/.MainActivity
+adb shell am start -n com.relay.client/.MainActivity
 
 # Monitor logs
 adb logcat | grep -E "QuickJSManager|NativeRenderer|ThemedStyler"
@@ -162,7 +162,7 @@ Key tags to monitor:
 adb logcat
 
 # Filter by tag
-adb logcat | grep NativeRenderer
+adb logcat | grep AndroidRenderer
 
 # Show last 500 lines
 adb logcat -d | head -500

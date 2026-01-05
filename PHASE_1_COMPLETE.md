@@ -132,7 +132,7 @@ nativeBridge.createView(-1, 'div', {
 // Flow:
 // 1. JSI binding in C++ (jsi_bridge.cpp)
 // 2. Calls HermesNativeBridge.createView()
-// 3. NativeRenderer.createView() creates FrameLayout
+// 3. AndroidRenderer.createView() creates FrameLayout
 // 4. applyStyles() parses className and applies properties
 // 5. setLayoutParams() sets width/height
 // 6. view.setBackgroundColor(Color.WHITE)

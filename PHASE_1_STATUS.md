@@ -124,7 +124,7 @@ To build and test Phase 1:
 
 ```bash
 # Build debug APK
-cd /home/ari/dev/react-client-android/android
+cd /home/ari/dev/relay-client-android/android
 ./gradlew clean assembleDebug
 
 # Install on device/emulator

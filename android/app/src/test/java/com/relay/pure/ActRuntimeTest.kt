@@ -1,4 +1,4 @@
-package com.relay.pure
+package com.relay.client
 
 import app.cash.quickjs.QuickJs
 import com.google.gson.Gson
@@ -233,7 +233,7 @@ class ActRuntimeTest {
         val candidates = listOf(
             File(moduleDir, "app/src/main/assets/act.js"),
             File(moduleDir, "src/main/assets/act.js"),
-            File("/home/ari/dev/react-client-android/android/app/src/main/assets/act.js")
+            File("/home/ari/dev/relay-client-android/android/app/src/main/assets/act.js")
         )
         val actFile = candidates.firstOrNull { it.exists() } ?: throw IllegalStateException("act.js not found in assets")
         val actCode = actFile.readText()

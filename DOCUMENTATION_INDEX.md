@@ -125,7 +125,7 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ANDROID_NDK_HOME/toolchains/l
 
 ### Building APK
 ```bash
-cd react-client-android
+cd relay-client-android
 # Set environment (see above)
 cd android && ./gradlew assembleDebug && ./gradlew installDebug
 ```
@@ -157,7 +157,7 @@ See **start_enhanced.jsx** for button click test example.
 ## Directory Structure
 
 ```
-react-client-android/
+relay-client-android/
 ├── android/                          # Gradle project
 │   ├── app/src/main/
 │   │   ├── java/com/relay/pure/     # Kotlin code (NativeRenderer, etc.)
