@@ -1,0 +1,15 @@
+{
+  "source": "hooks/client/get.jsx routeKind + fb-nav / fb-footer",
+  "pages": [
+    { "id": "library", "title": "Library", "kind": "library", "routes": ["/", ""] },
+    { "id": "setup", "title": "Setup", "kind": "md", "file": "content/setup.md", "routes": ["/setup", "/playback", "/vlc"] },
+    { "id": "request", "title": "Request", "kind": "md", "file": "content/request.md", "routes": ["/request", "/downloads", "/email"] },
+    { "id": "motivation", "title": "Why", "kind": "md", "file": "content/motivation.md", "routes": ["/motivation", "/why"] },
+    { "id": "submit", "title": "Submit", "kind": "md", "file": "content/submit.md", "routes": ["/submit", "/contribute"] },
+    { "id": "board", "title": "Board", "kind": "board", "routes": ["/board", "/feedback", "/bugs"] },
+    { "id": "legal", "title": "Legal", "kind": "md", "file": "content/legal.md", "routes": ["/legal"] },
+    { "id": "terms", "title": "Terms", "kind": "md", "file": "content/terms.md", "routes": ["/terms"] },
+    { "id": "android-lab", "title": "Android lab", "kind": "lab", "file": "content/android-lab.md", "routes": ["/android-lab"] },
+    { "id": "updates", "title": "Check for updates", "kind": "updates" }
+  ]
+}

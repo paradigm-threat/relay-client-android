@@ -39,6 +39,13 @@ class MainActivity : AppCompatActivity() {
         flashbackShell?.onConfigurationChanged()
     }
 
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (flashbackShell?.onBackPressed() == true) return
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (BuildConfig.RELAY_LOCK_ORIGIN && keyCode == KeyEvent.KEYCODE_SETTINGS) {
             return true

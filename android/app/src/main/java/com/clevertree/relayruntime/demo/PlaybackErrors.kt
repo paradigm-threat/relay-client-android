@@ -62,6 +62,7 @@ object PlaybackErrors {
             kind = Kind.NETWORK,
             title = "Stream didn't load",
             body = "Check your connection, then try again. " +
+                "Large titles sometimes need a moment while the stream finishes seeding — wait and retry. " +
                 "You can also open the same URL in an external player.",
         )
         Kind.FORMAT -> Message(

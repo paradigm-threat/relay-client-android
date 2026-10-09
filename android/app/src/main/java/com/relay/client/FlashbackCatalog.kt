@@ -18,7 +18,21 @@ data class FlashbackProject(
     val mediaMobile: String,
     val image: String,
     val blurb: String,
+    /** From project `stats.json` via index.json (optional). */
+    val faneditRuntime: String = "",
+    val timeCut: String = "",
+    val availableIn: String = "",
+    val filmRuntime: String = "",
 ) {
+    /** Compact stats line for title / Now Showing meta. */
+    fun statsLine(): String {
+        val parts = ArrayList<String>(3)
+        if (faneditRuntime.isNotBlank()) parts.add("edit $faneditRuntime")
+        if (timeCut.isNotBlank()) parts.add("cut $timeCut")
+        if (availableIn.isNotBlank()) parts.add(availableIn)
+        return parts.joinToString(" · ")
+    }
+
     /** Progressive HTTPS master URL with percent-encoded path segments (spaces, etc.). */
     fun masterStreamUrl(origin: String): String? {
         if (media.isBlank()) return null
@@ -71,6 +85,10 @@ object FlashbackCatalog {
                     mediaMobile = o.optString("mediaMobile"),
                     image = o.optString("image"),
                     blurb = o.optString("blurb"),
+                    faneditRuntime = o.optString("faneditRuntime"),
+                    timeCut = o.optString("timeCut"),
+                    availableIn = o.optString("availableIn"),
+                    filmRuntime = o.optString("filmRuntime"),
                 ),
             )
         }
@@ -112,6 +130,35 @@ object FlashbackCatalog {
         val base = origin.trim().trimEnd('/')
         val rel = path.trim().trimStart('/')
         return httpGet("$base/$rel")
+    }
+
+    /**
+     * First bullets under `## What changed` / `## Changes` in a project README.
+     * Kept brief for native meta under the blurb.
+     */
+    fun changesBriefFromReadme(readme: String?, maxBullets: Int = 4): String {
+        if (readme.isNullOrBlank()) return ""
+        val lines = readme.lines()
+        var inSection = false
+        val bullets = ArrayList<String>(maxBullets)
+        for (raw in lines) {
+            val s = raw.trim()
+            if (s.startsWith("## ")) {
+                if (inSection) break
+                val head = s.removePrefix("## ").lowercase()
+                inSection = head.contains("what changed") ||
+                    head == "changes" ||
+                    head.contains("cut list")
+                continue
+            }
+            if (!inSection) continue
+            if (s.startsWith("#") || s == "---") break
+            if (s.startsWith("- ") || s.startsWith("* ")) {
+                bullets.add(s)
+                if (bullets.size >= maxBullets) break
+            }
+        }
+        return bullets.joinToString("\n")
     }
 
     /**

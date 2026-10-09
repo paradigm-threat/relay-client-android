@@ -126,4 +126,45 @@ class FlashbackCatalogTest {
         assertTrue(project("x", media = "x.mkv").hasStreamMedia)
         assertTrue(project("x").copy(mediaWeb = "x.mp4").hasStreamMedia)
     }
+
+    @Test
+    fun statsLineJoinsRuntimeFields() {
+        val p = project("x").copy(
+            faneditRuntime = "1:50:25",
+            timeCut = "0:14:24",
+            availableIn = "2160p HEVC MKV (AAC)",
+        )
+        assertEquals("edit 1:50:25 · cut 0:14:24 · 2160p HEVC MKV (AAC)", p.statsLine())
+    }
+
+    @Test
+    fun changesBriefFromReadmeTakesWhatChangedBullets() {
+        val readme = """
+            # Title
+
+            Blurb with **bold**.
+
+            ## Why this cut
+
+            Prose.
+
+            ## What changed
+
+            - First removal
+            - Second removal
+            - Third removal
+            - Fourth removal
+            - Fifth ignored
+
+            ## Subtitles
+
+            - English
+        """.trimIndent()
+        val brief = FlashbackCatalog.changesBriefFromReadme(readme)
+        assertEquals(
+            "- First removal\n- Second removal\n- Third removal\n- Fourth removal",
+            brief,
+        )
+    }
+
 }

@@ -37,8 +37,8 @@ android {
         // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
         // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 14
-        versionName "1.0.14"
+        versionCode 17
+        versionName "1.0.17"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -106,6 +106,26 @@ android {
     }
 }
 
+// Sync site markdown into APK assets (offline drawer fallback):
+//   ./gradlew :app:syncFlashbackContent -PflashbackContentDir=/path/to/fan-edits/content
+tasks.register("syncFlashbackContent", Copy) {
+    def contentProp = project.findProperty("flashbackContentDir")
+    def contentDir = contentProp != null && !contentProp.toString().trim().isEmpty()
+            ? file(contentProp.toString())
+            : file("${rootProject.projectDir}/../../../fan-edits/content")
+    from(contentDir) {
+        include "*.md"
+    }
+    into "src/main/assets/content"
+    doFirst {
+        if (!contentDir.isDirectory()) {
+            throw new GradleException(
+                    "flashback content dir missing: ${contentDir}. Pass -PflashbackContentDir=...",
+            )
+        }
+    }
+}
+
 // Write downloads/flashback.json for fan-edits publish tip:
 //   ./gradlew :app:writeFlashbackVersionManifest -PflashbackManifestOut=/path/to/fan-edits/downloads/flashback.json
 tasks.register("writeFlashbackVersionManifest") {
@@ -130,6 +150,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.21"
     implementation "androidx.core:core-ktx:1.10.1"
     implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "androidx.drawerlayout:drawerlayout:1.2.0"
     implementation "com.google.android.material:material:1.9.0"
 
     // For JSON handling

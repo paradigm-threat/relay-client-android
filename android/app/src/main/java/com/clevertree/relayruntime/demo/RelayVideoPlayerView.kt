@@ -21,7 +21,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -81,20 +80,25 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
             .build()
-        // Progressive multi‑GB masters: keep a modest ahead buffer without disk cache thrash.
+        // Progressive multi‑GB masters over IPFS Range windows: keep a deep ahead buffer so
+        // brief gateway latency doesn't rebuffer (4K HEVC burns through buffer quickly).
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs */ 15_000,
-                /* maxBufferMs */ 50_000,
+                /* minBufferMs */ 50_000,
+                /* maxBufferMs */ 120_000,
+                // Still start fairly soon, but after a stall wait for a healthier cushion.
                 /* bufferForPlaybackMs */ 2_500,
-                /* bufferForPlaybackAfterRebufferMs */ 5_000,
+                /* bufferForPlaybackAfterRebufferMs */ 8_000,
             )
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         player = ExoPlayer.Builder(context)
             .setAudioAttributes(mediaAudio, /* handleAudioFocus= */ true)
             .setHandleAudioBecomingNoisy(true)
             .setLoadControl(loadControl)
             .build()
+        // Avoid a MediaSession controller / OEM media stack pausing us before the first frame.
+        // Theater + Lab drive the player directly; session is optional for lockscreen artwork later.
         try {
             mediaSession = MediaSession.Builder(context, player).build()
         } catch (e: Exception) {
@@ -111,7 +115,8 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             isFocusableInTouchMode = true
             controllerShowTimeoutMs = 3500
             controllerHideOnTouch = true
-            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            // Show spinner while progressive HTTPS masters connect (not only after playWhenReady).
+            setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
             keepScreenOn = true
             player = this@RelayVideoPlayerView.player
         }
@@ -202,14 +207,30 @@ class RelayVideoPlayerView @JvmOverloads constructor(
 
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (released) return
                 anyPlaying = isPlaying
                 keepScreenOn = isPlaying || player.playbackState == Player.STATE_BUFFERING
+                Log.i(TAG, "isPlaying=$isPlaying state=${player.playbackState} ready=${player.playWhenReady}")
                 invokeHandlerProp("onPlay", isPlaying)
                 invokeHandlerProp("onPause", !isPlaying)
             }
 
             override fun onPlaybackStateChanged(state: Int) {
+                if (released) return
+                val name = when (state) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "OTHER($state)"
+                }
+                Log.i(TAG, "state=$name playWhenReady=${player.playWhenReady} pos=${player.currentPosition}")
                 if (state == Player.STATE_ENDED) invokeHandlerProp("onEnded", true)
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (released) return
+                Log.i(TAG, "playWhenReady=$playWhenReady reason=$reason state=${player.playbackState}")
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -322,6 +343,10 @@ class RelayVideoPlayerView @JvmOverloads constructor(
     }
 
     fun bindProps(props: JSONObject, onRenderRequested: () -> Unit) {
+        if (released) {
+            Log.w(TAG, "bindProps ignored — player already released")
+            return
+        }
         this.onRenderRequested = onRenderRequested
         propsRef = props
 
@@ -329,8 +354,9 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         playerView.useController = controls
 
         val src = RelayMediaUrls.resolve(propString(props, "src"))
-        if (src != null && src != boundSrc && !released) {
+        if (src != null && src != boundSrc) {
             boundSrc = src
+            Log.i(TAG, "bind src=$src")
             hidePlaybackError()
             val local = MovieDownloadService.fileFor(context, src)
             val uri = if (local.isFile && local.length() > 0L && File(local.path + ".done").isFile) {
@@ -348,21 +374,29 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             }
             val item = itemBuilder.build()
             // Progressive HTTP for multi‑GB masters — no SimpleCache (avoids thrash).
+            // Use bounded Range chunks: full GET / open-ended Range hang on Relay/IPFS edges.
             if (uri.scheme == "file") {
                 player.setMediaItem(item)
             } else {
-                val upstream = DefaultHttpDataSource.Factory()
-                    .setUserAgent("FlashbackRepository/1.0 (Android ExoPlayer)")
-                    .setAllowCrossProtocolRedirects(true)
-                    .setConnectTimeoutMs(20_000)
-                    .setReadTimeoutMs(60_000)
+                val upstream = RangeEnforcingDataSource.Factory()
                 player.setMediaSource(ProgressiveMediaSource.Factory(upstream).createMediaSource(item))
             }
+            // Set playWhenReady BEFORE prepare — otherwise first BUFFERING lands paused (pause icon @ 0s).
+            val wantAutoplay = propBoolLoose(props, "autoPlay") != false
+            player.playWhenReady = wantAutoplay
             player.prepare()
-            // Prefer playWhenReady so autoplay starts as soon as the progressive stream is READY.
-            if (propBoolLoose(props, "autoPlay") == true) {
-                player.playWhenReady = true
+            if (wantAutoplay) {
+                player.play()
+                // ColorOS / focus races can clear playWhenReady right after prepare — re-assert shortly.
+                postDelayed({
+                    if (!released && wantAutoplay && !player.playWhenReady && boundSrc == src) {
+                        Log.w(TAG, "playWhenReady cleared after prepare — retrying play()")
+                        player.playWhenReady = true
+                        player.play()
+                    }
+                }, 400)
             }
+            Log.i(TAG, "prepared autoplay=$wantAutoplay playWhenReady=${player.playWhenReady}")
             // Audio focus is owned by ExoPlayer (handleAudioFocus=true) — do not dual-request.
             invokeHandlerProp("onLoadedMetadata", true)
         }
@@ -400,29 +434,52 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             }
         }
 
+        // Re-assert autoplay after other props (playing/seek/commands) so nothing leaves us paused @ 0.
         propBoolLoose(props, "autoPlay")?.let { auto ->
-            player.playWhenReady = auto
-            if (auto) player.play()
+            if (auto && !player.playWhenReady) {
+                Log.i(TAG, "re-assert playWhenReady after props")
+                player.playWhenReady = true
+                player.play()
+            } else if (!auto) {
+                player.playWhenReady = false
+            }
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        startTimeUpdates()
+        // Orientation / immersive theater briefly detaches views — never release here.
+        if (!released) startTimeUpdates()
     }
 
     override fun onDetachedFromWindow() {
         stopTimeUpdates()
         anyPlaying = false
-        post {
-            if (!isAttachedToWindow && !released) {
-                released = true
-                mediaSession?.release()
-                mediaSession = null
-                player.release()
-            }
-        }
         super.onDetachedFromWindow()
+    }
+
+    /**
+     * Release ExoPlayer + MediaSession. Call from the shell when leaving theater / clearing UI.
+     * Do not release from [onDetachedFromWindow] — landscape theater detaches during rotation.
+     */
+    fun releasePlayer() {
+        if (released) return
+        released = true
+        stopTimeUpdates()
+        anyPlaying = false
+        try {
+            playerView.player = null
+        } catch (_: Exception) {
+        }
+        try {
+            mediaSession?.release()
+        } catch (_: Exception) {
+        }
+        mediaSession = null
+        try {
+            player.release()
+        } catch (_: Exception) {
+        }
     }
 
     private val timeRunnable = object : Runnable {

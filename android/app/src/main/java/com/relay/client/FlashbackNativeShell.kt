@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -24,6 +25,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import com.clevertree.relayruntime.demo.ExternalMediaIntents
 import com.clevertree.relayruntime.demo.HevcCapability
 import com.clevertree.relayruntime.demo.PlaybackErrors
@@ -35,6 +38,7 @@ import java.net.URL
 /**
  * Flashback flavor UI without CleverScript: home (Now Showing) → title → ownership → Play.
  * Affirmation unlocks theater chrome only; playback starts when the user taps Play.
+ * Site pages live in a Material [DrawerLayout] (permanent rail on wide layouts).
  */
 class FlashbackNativeShell(
     context: Context,
@@ -46,6 +50,11 @@ class FlashbackNativeShell(
     private val cream = Color.parseColor("#f5e6be")
     private val creamMuted = Color.parseColor("#c9b896")
     private val gold = Color.parseColor("#e8c872")
+    private val drawerBg = Color.parseColor("#1a0a0c")
+
+    private val contentHost = FrameLayout(context)
+    private val drawerLayout: DrawerLayout
+    private val permanentDrawer: Boolean
 
     private var projects: List<FlashbackProject> = emptyList()
     private var nowShowingSlugs: List<String> = emptyList()
@@ -55,11 +64,53 @@ class FlashbackNativeShell(
     private var pendingUpdate: RemoteAppVersion? = null
     private var updateCheckStarted: Boolean = false
     private var bannerDismissedThisSession: Boolean = false
+    private var currentScreen: String = "library"
+    private var lastPlaybackError: String? = null
+    private var bugFooterDismissedThisSession: Boolean = false
+    private val bugFooter: View
 
     init {
         setBackgroundColor(house)
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         RelayMediaUrls.fetchBaseUrl = origin.trim().trimEnd('/')
+
+        permanentDrawer = resources.configuration.smallestScreenWidthDp >= 720
+        drawerLayout = DrawerLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            setBackgroundColor(house)
+            setScrimColor(Color.parseColor("#99000000"))
+        }
+        contentHost.layoutParams = DrawerLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+        drawerLayout.addView(contentHost)
+
+        val drawerPanel = buildNavDrawer()
+        drawerPanel.layoutParams = DrawerLayout.LayoutParams(
+            dp(300),
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            GravityCompat.START,
+        )
+        drawerLayout.addView(drawerPanel)
+        addView(drawerLayout)
+
+        bugFooter = buildBugReportFooter()
+        addView(
+            bugFooter,
+            LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM,
+            ),
+        )
+
+        if (permanentDrawer) {
+            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_OPEN)
+            drawerLayout.setScrimColor(Color.TRANSPARENT)
+        }
+
+        refreshBugFooterVisibility()
         showLoading("Loading library…")
         Thread {
             try {
@@ -78,6 +129,15 @@ class FlashbackNativeShell(
         }.start()
     }
 
+    /** Close the sliding drawer on back (phones); permanent rail stays open. */
+    fun onBackPressed(): Boolean {
+        if (!permanentDrawer && drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            return true
+        }
+        return false
+    }
+
     private fun applyLibrary(library: FlashbackLibrary) {
         projects = library.projects
         nowShowingSlugs = library.nowShowingSlugs
@@ -88,24 +148,47 @@ class FlashbackNativeShell(
     }
 
     private fun clear() {
-        removeAllViews()
+        playerView?.releasePlayer()
         playerView = null
+        contentHost.removeAllViews()
         inTheater = false
+        setDrawerEnabled(true)
+    }
+
+    private fun setDrawerEnabled(enabled: Boolean) {
+        if (permanentDrawer) {
+            drawerLayout.setDrawerLockMode(
+                if (enabled) DrawerLayout.LOCK_MODE_LOCKED_OPEN else DrawerLayout.LOCK_MODE_LOCKED_CLOSED,
+            )
+            return
+        }
+        if (!enabled) drawerLayout.closeDrawer(GravityCompat.START)
+        drawerLayout.setDrawerLockMode(
+            if (enabled) DrawerLayout.LOCK_MODE_UNLOCKED else DrawerLayout.LOCK_MODE_LOCKED_CLOSED,
+        )
+    }
+
+    private fun openDrawer() {
+        if (!permanentDrawer) drawerLayout.openDrawer(GravityCompat.START)
     }
 
     private fun showLoading(msg: String) {
         clear()
-        addView(
+        contentHost.addView(
             ProgressBar(context).apply {
-                layoutParams = LayoutParams(dp(48), dp(48), Gravity.CENTER)
+                layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER)
             },
         )
-        addView(
+        contentHost.addView(
             TextView(context).apply {
                 text = msg
                 setTextColor(creamMuted)
                 gravity = Gravity.CENTER
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER,
+                ).apply {
                     topMargin = dp(72)
                 }
             },
@@ -138,21 +221,16 @@ class FlashbackNativeShell(
 
     private fun showLibrary() {
         clear()
+        currentScreen = "library"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
         selected = null
+        refreshBugFooterVisibility()
         val col = column()
         col.addView(heading("Flashback Repository"))
         col.addView(body("Own the original. Then improve it."))
         updateBanner()?.let { col.addView(it) }
         col.addView(siteMenuRow())
-        col.addView(
-            linkRow(
-                "Lab" to { showPlaybackLab() },
-                "Board" to { openSitePath("/board") },
-                "Check for updates" to { maybeCheckForUpdates(silent = false) },
-            ),
-        )
 
         val showing = FlashbackCatalog.resolveNowShowing(projects, nowShowingSlugs)
         if (showing.isNotEmpty()) {
@@ -227,15 +305,99 @@ class FlashbackNativeShell(
         }
     }
 
-    /** Site pages the web exposes as markdown — rendered via [RelayMarkdownView]. */
+    /** Compact in-page shortcuts (full list is in the navigation drawer). */
     private fun siteMenuRow(): LinearLayout =
         linkRow(
-            "Setup" to { showMarkdownDoc("Setup", "content/setup.md") },
-            "Legal" to { showMarkdownDoc("Ownership", "content/legal.md") },
-            "Motivation" to { showMarkdownDoc("Motivation", "content/motivation.md") },
-            "Terms" to { showMarkdownDoc("Terms", "content/terms.md") },
+            "Setup" to { showMarkdownDoc("Setup for playback", "content/setup.md") },
+            "Legal" to { showMarkdownDoc("Ownership policy", "content/legal.md") },
+            "Why" to { showMarkdownDoc("Why we’re doing this", "content/motivation.md") },
             "Request" to { showMarkdownDoc("Request downloads", "content/request.md") },
         )
+
+    private fun buildNavDrawer(): View {
+        val scroll = ScrollView(context).apply {
+            setBackgroundColor(drawerBg)
+            isFillViewport = true
+        }
+        val col = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(28), dp(16), dp(28))
+        }
+        col.addView(
+            TextView(context).apply {
+                text = "Flashback"
+                setTextColor(gold)
+                textSize = 20f
+                typeface = Typeface.SERIF
+                setPadding(0, 0, 0, dp(4))
+            },
+        )
+        col.addView(
+            TextView(context).apply {
+                text = "Menu"
+                setTextColor(creamMuted)
+                textSize = 13f
+                setPadding(0, 0, 0, dp(16))
+            },
+        )
+        for (item in FlashbackSiteContent.drawerItems) {
+            col.addView(
+                TextView(context).apply {
+                    text = item.title
+                    setTextColor(cream)
+                    textSize = 16f
+                    setPadding(dp(8), dp(14), dp(8), dp(14))
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { onDrawerItem(item) }
+                },
+            )
+        }
+        scroll.addView(col)
+        return scroll
+    }
+
+    private fun onDrawerItem(item: FlashbackSiteContent.NavItem) {
+        if (!permanentDrawer) drawerLayout.closeDrawer(GravityCompat.START)
+        when (val action = item.action) {
+            is FlashbackSiteContent.NavAction.Library -> {
+                selected = null
+                showLibrary()
+            }
+            is FlashbackSiteContent.NavAction.Markdown ->
+                showMarkdownDoc(action.title, action.path)
+            is FlashbackSiteContent.NavAction.PlaybackLab -> showPlaybackLab()
+            is FlashbackSiteContent.NavAction.Board -> showBugReportForm()
+            is FlashbackSiteContent.NavAction.CheckUpdates -> maybeCheckForUpdates(silent = false)
+        }
+    }
+
+    private fun topBar(): LinearLayout {
+        val bar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+        if (!permanentDrawer) {
+            bar.addView(
+                TextView(context).apply {
+                    text = "☰"
+                    setTextColor(gold)
+                    textSize = 22f
+                    setPadding(0, dp(4), dp(16), dp(4))
+                    contentDescription = "Open menu"
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { openDrawer() }
+                },
+            )
+        }
+        return bar
+    }
 
     private fun projectRow(p: FlashbackProject): View {
         return LinearLayout(context).apply {
@@ -261,14 +423,75 @@ class FlashbackNativeShell(
                     },
                 )
             }
+            val stats = p.statsLine()
+            if (stats.isNotBlank()) {
+                addView(
+                    TextView(context).apply {
+                        text = stats
+                        setTextColor(creamMuted)
+                        textSize = 12f
+                        setPadding(0, dp(4), 0, 0)
+                    },
+                )
+            }
         }
+    }
+
+    /**
+     * Blurb + compact stats/change list via [RelayMarkdownView].
+     * (Page ScrollView already scrolls long copy; web carousel scrolls inside the card.)
+     * Change bullets load async from project README.
+     */
+    private fun titleCopyBlock(p: FlashbackProject): View {
+        val wrap = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(10) }
+        }
+        if (p.blurb.isNotBlank()) {
+            wrap.addView(
+                RelayMarkdownView(context).apply {
+                    setMarkdown(p.blurb)
+                    setPadding(0, 0, 0, dp(4))
+                },
+            )
+        }
+        val stats = p.statsLine()
+        val meta = RelayMarkdownView(context).apply {
+            textSize = 12f
+            bodyColor = creamMuted
+            setPadding(0, dp(6), 0, 0)
+            if (stats.isNotBlank()) {
+                setMarkdown("**Stats** — $stats")
+            }
+        }
+        wrap.addView(meta)
+        Thread {
+            val readme = FlashbackCatalog.fetchText(origin, "${p.path}/README.md")
+            val changes = FlashbackCatalog.changesBriefFromReadme(readme)
+            if (changes.isBlank() && stats.isBlank()) return@Thread
+            val md = buildString {
+                if (stats.isNotBlank()) append("**Stats** — $stats")
+                if (changes.isNotBlank()) {
+                    if (isNotEmpty()) append("\n\n")
+                    append("**Changes**\n")
+                    append(changes)
+                }
+            }
+            main.post { meta.setMarkdown(md) }
+        }.start()
+        return wrap
     }
 
     private fun showTitle(p: FlashbackProject) {
         selected = p
         clear()
+        currentScreen = "title"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
+        refreshBugFooterVisibility()
 
         val movieAck = FlashbackOwnership.hasAck(context, FlashbackOwnership.movieKey(p.slug))
         val stream = p.masterStreamUrl(origin)
@@ -285,14 +508,7 @@ class FlashbackNativeShell(
             },
         )
         col.addView(heading(p.title))
-        if (p.blurb.isNotBlank()) {
-            col.addView(
-                RelayMarkdownView(context).apply {
-                    setMarkdown(p.blurb)
-                    setPadding(0, 0, 0, dp(10))
-                },
-            )
-        }
+        col.addView(titleCopyBlock(p))
 
         val posterUrl = p.posterUrl(origin)
         if (!posterUrl.isNullOrBlank()) {
@@ -329,7 +545,7 @@ class FlashbackNativeShell(
             )
             col.addView(
                 linkRow(
-                    "Ownership policy" to { showMarkdownDoc("Ownership", "content/legal.md") },
+                    "Ownership policy" to { showMarkdownDoc("Ownership policy", "content/legal.md") },
                     "Terms" to { showMarkdownDoc("Terms", "content/terms.md") },
                 ),
             )
@@ -349,7 +565,9 @@ class FlashbackNativeShell(
             )
             col.addView(
                 secondaryButton("Get VLC") {
-                    openSitePath("https://play.google.com/store/apps/details?id=org.videolan.vlc")
+                    if (!ExternalMediaIntents.openVlcPlayStore(context)) {
+                        Toast.makeText(context, "Could not open Play Store", Toast.LENGTH_SHORT).show()
+                    }
                 },
             )
         } else if (p.hasStreamMedia) {
@@ -370,11 +588,18 @@ class FlashbackNativeShell(
         clear()
         inTheater = true
         selected = p
+        currentScreen = "theater"
+        setDrawerEnabled(false)
+        refreshBugFooterVisibility()
+        // Lock landscape before attaching the player so the first bind is not torn down mid-prepare.
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         enterImmersive()
 
         val root = FrameLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            layoutParams = FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT,
+            )
             setBackgroundColor(Color.BLACK)
         }
 
@@ -383,7 +608,7 @@ class FlashbackNativeShell(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
-            onPlaybackFailed = { /* card already shown inside player */ }
+            onPlaybackFailed = { line -> lastPlaybackError = line }
         }
         playerView = player
         root.addView(player)
@@ -432,8 +657,11 @@ class FlashbackNativeShell(
             },
         )
 
-        addView(root)
-        player.bindSrc(stream, autoPlay = true)
+        contentHost.addView(root)
+        // Bind after the view is attached so PlayerView has a surface; autoplay via playWhenReady.
+        player.post {
+            if (!player.released) player.bindSrc(stream, autoPlay = true)
+        }
     }
 
     /**
@@ -441,8 +669,10 @@ class FlashbackNativeShell(
      */
     private fun showPlaybackLab() {
         clear()
+        currentScreen = "lab"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
+        refreshBugFooterVisibility()
         val report = HevcCapability.probe()
         val col = column()
         col.addView(
@@ -482,17 +712,22 @@ class FlashbackNativeShell(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(240),
             )
+            onPlaybackFailed = { line -> lastPlaybackError = line }
         }
         playerView = player
         col.addView(player)
 
         col.addView(
             primaryButton("Simulate decode error") {
+                val msg = PlaybackErrors.messageFor(PlaybackErrors.Kind.DECODER)
+                lastPlaybackError = msg.bannerLine()
                 player.showSimulatedError(PlaybackErrors.Kind.DECODER)
             },
         )
         col.addView(
             secondaryButton("Simulate network error") {
+                val msg = PlaybackErrors.messageFor(PlaybackErrors.Kind.NETWORK)
+                lastPlaybackError = msg.bannerLine()
                 player.showSimulatedError(PlaybackErrors.Kind.NETWORK)
             },
         )
@@ -530,8 +765,10 @@ class FlashbackNativeShell(
 
     private fun showMarkdownDoc(title: String, path: String) {
         clear()
+        currentScreen = "markdown"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
+        refreshBugFooterVisibility()
         val col = column()
         col.addView(
             TextView(context).apply {
@@ -548,13 +785,16 @@ class FlashbackNativeShell(
         )
         col.addView(heading(title))
         val mdView = RelayMarkdownView(context)
+        mdView.setPlainFallback("Loading…")
         col.addView(mdView)
         wrapScroll(col)
         Thread {
-            val text = FlashbackCatalog.fetchText(origin, path)
+            val text = FlashbackSiteContent.loadMarkdown(context, origin, path)
             main.post {
                 if (text.isNullOrBlank()) {
-                    mdView.setPlainFallback("Could not load $path. Check your connection.")
+                    mdView.setPlainFallback(
+                        "Could not load $path (offline copy missing). Check your connection.",
+                    )
                 } else {
                     mdView.setMarkdown(text)
                 }
@@ -755,19 +995,39 @@ class FlashbackNativeShell(
     }
 
     private fun wrapScroll(col: LinearLayout) {
-        val scroll = ScrollView(context).apply {
-            isFillViewport = true
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-            addView(col)
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT,
+            )
+            setBackgroundColor(house)
+            addView(topBar())
+            addView(
+                ScrollView(context).apply {
+                    isFillViewport = true
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        0,
+                        1f,
+                    )
+                    addView(col)
+                },
+            )
         }
-        addView(scroll)
+        // column() already pads; strip top padding clash with hamburger bar
+        col.setPadding(dp(18), dp(4), dp(18), dp(40))
+        contentHost.addView(root)
     }
 
     private fun column(): LinearLayout =
         LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(20), dp(18), dp(40))
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
         }
 
     private fun heading(text: String): TextView =
@@ -860,6 +1120,120 @@ class FlashbackNativeShell(
     }
 
     private fun activity(): AppCompatActivity? = context as? AppCompatActivity
+
+    private fun buildBugReportFooter(): View {
+        val bar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#cc1a0a0c"))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            visibility = View.GONE
+        }
+        bar.addView(
+            TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                text = "Found a bug? Report it on the board."
+                setTextColor(creamMuted)
+                textSize = 13f
+            },
+        )
+        bar.addView(
+            TextView(context).apply {
+                text = "Report"
+                setTextColor(gold)
+                textSize = 14f
+                setPadding(dp(8), 0, dp(8), 0)
+                isClickable = true
+                setOnClickListener { showBugReportForm() }
+            },
+        )
+        bar.addView(
+            TextView(context).apply {
+                text = "✕"
+                setTextColor(creamMuted)
+                textSize = 16f
+                isClickable = true
+                setOnClickListener {
+                    bugFooterDismissedThisSession = true
+                    FlashbackBugReport.markFooterDismissed(context)
+                    refreshBugFooterVisibility()
+                }
+            },
+        )
+        return bar
+    }
+
+    private fun refreshBugFooterVisibility() {
+        val show = !inTheater &&
+            !bugFooterDismissedThisSession &&
+            FlashbackBugReport.shouldShowFooter(context)
+        bugFooter.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    private fun showBugReportForm() {
+        val titleField = EditText(context).apply {
+            hint = "Short title"
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+        }
+        val bodyField = EditText(context).apply {
+            hint = "What happened?"
+            minLines = 4
+            gravity = Gravity.TOP
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+        }
+        val form = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), 0)
+            addView(titleField)
+            addView(bodyField)
+        }
+        AlertDialog.Builder(context)
+            .setTitle("Bug report")
+            .setView(form)
+            .setPositiveButton("Send") { _, _ ->
+                val snap = FlashbackBugReport.DebugSnapshot(
+                    versionName = BuildConfig.VERSION_NAME,
+                    versionCode = BuildConfig.VERSION_CODE,
+                    packageName = context.packageName,
+                    deviceModel = FlashbackBugReport.deviceModelLabel(),
+                    sdkInt = android.os.Build.VERSION.SDK_INT,
+                    origin = origin,
+                    screen = currentScreen,
+                    slug = selected?.slug,
+                    lastPlaybackError = lastPlaybackError,
+                    logcatSnippet = FlashbackBugReport.readLogcatSnippet(),
+                )
+                val req = FlashbackBugReport.SubmitRequest(
+                    title = titleField.text?.toString().orEmpty(),
+                    body = bodyField.text?.toString().orEmpty(),
+                    pagePath = "/android",
+                    snapshot = snap,
+                )
+                Thread {
+                    val result = FlashbackBugReport.submit(origin, req)
+                    main.post {
+                        when (result) {
+                            is FlashbackBugReport.SubmitResult.Ok ->
+                                Toast.makeText(context, "Thanks — report posted.", Toast.LENGTH_LONG).show()
+                            is FlashbackBugReport.SubmitResult.ValidationError ->
+                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                            is FlashbackBugReport.SubmitResult.HttpError ->
+                                Toast.makeText(
+                                    context,
+                                    "Server error (${result.status}): ${result.detail.take(120)}",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            is FlashbackBugReport.SubmitResult.NetworkError ->
+                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }.start()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
     private fun dp(v: Int): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
