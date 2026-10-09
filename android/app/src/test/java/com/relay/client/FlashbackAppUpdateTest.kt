@@ -74,6 +74,49 @@ class FlashbackAppUpdateTest {
     }
 
     @Test
+    fun parseManifestReadsApkUrlsByAbi() {
+        val remote = FlashbackAppUpdate.parseManifest(
+            """
+            {
+              "versionCode": 20,
+              "versionName": "1.0.20",
+              "apkUrl": "https://flashbackrepository.org/downloads/flashback.apk",
+              "apkUrls": {
+                "armeabi-v7a": "/downloads/flashback-armeabi-v7a.apk",
+                "arm64-v8a": "https://flashbackrepository.org/downloads/flashback-arm64-v8a.apk"
+              }
+            }
+            """.trimIndent(),
+        )
+        requireNotNull(remote)
+        assertEquals(2, remote.apkUrls.size)
+        assertEquals(
+            "https://flashbackrepository.org/downloads/flashback-armeabi-v7a.apk",
+            FlashbackAppUpdate.resolveApkUrl(
+                "https://flashbackrepository.org",
+                remote,
+                listOf("armeabi-v7a", "armeabi"),
+            ),
+        )
+        assertEquals(
+            "https://flashbackrepository.org/downloads/flashback-arm64-v8a.apk",
+            FlashbackAppUpdate.resolveApkUrl(
+                "https://flashbackrepository.org",
+                remote,
+                listOf("arm64-v8a", "armeabi-v7a"),
+            ),
+        )
+        assertEquals(
+            "https://flashbackrepository.org/downloads/flashback.apk",
+            FlashbackAppUpdate.resolveApkUrl(
+                "https://flashbackrepository.org",
+                remote,
+                listOf("x86_64"),
+            ),
+        )
+    }
+
+    @Test
     fun manifestUrlJoinsOrigin() {
         assertEquals(
             "https://flashbackrepository.org/downloads/flashback.json",

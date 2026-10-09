@@ -37,8 +37,8 @@ android {
         // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
         // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 19
-        versionName "1.0.19"
+        versionCode 23
+        versionName "1.0.23"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -92,8 +92,23 @@ android {
         }
     }
 
+    // Sideload / Fire TV: ship arm64 phones + 32-bit Amazon/Android TV separately.
+    // universalApk → downloads/flashback.apk (works everywhere; larger).
+    // Per-ABI → flashback-arm64-v8a.apk / flashback-armeabi-v7a.apk (smaller).
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a"
+            universalApk true
+        }
+    }
+
     packagingOptions {
         pickFirst "**/libc++_shared.so"
+        // Emulator ABIs stay in jniLibs for local debug; omit from sideload APKs.
+        exclude "lib/x86/**"
+        exclude "lib/x86_64/**"
     }
 
     compileOptions {
@@ -131,6 +146,10 @@ tasks.register("syncFlashbackContent", Copy) {
 tasks.register("writeFlashbackVersionManifest") {
     doLast {
         def outProp = project.findProperty("flashbackManifestOut")
+        if ((outProp == null || outProp.toString().trim().isEmpty()) &&
+                project.findProperty("flashbackDownloadsDir") != null) {
+            outProp = "${project.findProperty("flashbackDownloadsDir")}/flashback.json"
+        }
         if (outProp == null || outProp.toString().trim().isEmpty()) {
             throw new GradleException(
                 "Pass -PflashbackManifestOut=/path/to/fan-edits/downloads/flashback.json",
@@ -140,9 +159,55 @@ tasks.register("writeFlashbackVersionManifest") {
         outFile.parentFile.mkdirs()
         def code = android.defaultConfig.versionCode
         def name = android.defaultConfig.versionName
-        def apkUrl = "https://flashbackrepository.org/downloads/flashback.apk"
-        outFile.text = """{\n  "versionCode": ${code},\n  "versionName": "${name}",\n  "apkUrl": "${apkUrl}"\n}\n"""
+        def base = "https://flashbackrepository.org/downloads"
+        outFile.text = """{
+  "versionCode": ${code},
+  "versionName": "${name}",
+  "apkUrl": "${base}/flashback.apk",
+  "apkUrls": {
+    "armeabi-v7a": "${base}/flashback-armeabi-v7a.apk",
+    "arm64-v8a": "${base}/flashback-arm64-v8a.apk"
+  }
+}
+"""
         logger.lifecycle("Wrote Flashback version manifest → ${outFile.absolutePath} (versionCode=${code}, versionName=${name})")
+    }
+}
+
+// Copy split + universal release APKs into fan-edits/downloads after assembleFlashbackRelease:
+//   ./gradlew :app:publishFlashbackDownloads \
+//     -PflashbackDownloadsDir=/path/to/fan-edits/downloads \
+//     -PflashbackManifestOut=/path/to/fan-edits/downloads/flashback.json
+tasks.register("publishFlashbackDownloads") {
+    dependsOn("assembleFlashbackRelease", "writeFlashbackVersionManifest")
+    doLast {
+        def outProp = project.findProperty("flashbackDownloadsDir")
+        if (outProp == null || outProp.toString().trim().isEmpty()) {
+            throw new GradleException(
+                "Pass -PflashbackDownloadsDir=/path/to/fan-edits/downloads",
+            )
+        }
+        def outDir = file(outProp.toString())
+        outDir.mkdirs()
+        def releaseDir = file("$buildDir/outputs/apk/flashback/release")
+        def mapping = [
+            "app-flashback-universal-release.apk"    : "flashback.apk",
+            "app-flashback-armeabi-v7a-release.apk"  : "flashback-armeabi-v7a.apk",
+            "app-flashback-arm64-v8a-release.apk"    : "flashback-arm64-v8a.apk",
+        ]
+        mapping.each { srcName, destName ->
+            def src = new File(releaseDir, srcName)
+            if (!src.isFile()) {
+                throw new GradleException("Missing release APK: ${src.absolutePath}")
+            }
+            def dest = new File(outDir, destName)
+            java.nio.file.Files.copy(
+                    src.toPath(),
+                    dest.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
+            logger.lifecycle("Published ${destName} (${dest.length()} bytes) ← ${srcName}")
+        }
     }
 }
 

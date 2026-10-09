@@ -2,10 +2,12 @@ package com.clevertree.relayruntime.demo
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.util.AttributeSet
 import android.util.Log
+import android.util.TypedValue
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
@@ -20,13 +22,20 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.session.MediaSession
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.TrackSelectionDialogBuilder
 import com.clevertree.relayruntime.RelayRuntime
+import com.relay.client.FlashbackFocus
+import com.relay.client.FlashbackSubtitlePrefs
+import com.relay.client.FlashbackSubtitles
 import com.relay.client.MovieDownloadService
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,10 +68,18 @@ class RelayVideoPlayerView @JvmOverloads constructor(
     /** Optional callback when native UI (not CleverScript) needs error messaging. */
     var onPlaybackFailed: ((String) -> Unit)? = null
 
+    /**
+     * Fired when the Media3 transport controller shows or hides.
+     * Theater overlays (Back / External / CC) should mirror this so they don't sit forever on the picture.
+     */
+    var onControllerVisibilityChanged: ((Boolean) -> Unit)? = null
+
     private val playerView: PlayerView
     private lateinit var player: ExoPlayer
     private var mediaSession: MediaSession? = null
     private var boundSrc: String? = null
+    /** Src for which [applySubtitleAutoSelect] already ran (once per bind). */
+    private var autoSubsAppliedFor: String? = null
     private var lastCommandSeq: Long = -1L
     private var lastPlayingProp: Boolean? = null
     private var lastSeekProp: Double? = null
@@ -115,11 +132,18 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             isFocusableInTouchMode = true
             controllerShowTimeoutMs = 3500
             controllerHideOnTouch = true
+            setShowSubtitleButton(true)
+            setControllerVisibilityListener(
+                PlayerView.ControllerVisibilityListener { visibility ->
+                    onControllerVisibilityChanged?.invoke(visibility == VISIBLE)
+                },
+            )
             // Show spinner while progressive HTTPS masters connect (not only after playWhenReady).
             setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
             keepScreenOn = true
             player = this@RelayVideoPlayerView.player
         }
+        styleSubtitleView(playerView)
         addView(playerView)
 
         saveChrome = LinearLayout(context).apply {
@@ -135,8 +159,8 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         }
         val saveBtn = Button(context).apply {
             text = "Save offline"
-            isFocusable = true
             setOnClickListener { confirmSave() }
+            FlashbackFocus.decorate(this, FlashbackFocus.Style.PRIMARY, "Save offline")
         }
         saveChrome.addView(saveBtn)
         addView(saveChrome)
@@ -156,19 +180,27 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         openExternalBtn = Button(context).apply {
             text = PlaybackErrors.messageFor(PlaybackErrors.Kind.DECODER).primaryAction
             isAllCaps = false
-            isFocusable = true
             setOnClickListener { openBoundExternally() }
+            FlashbackFocus.decorate(
+                this,
+                FlashbackFocus.Style.PRIMARY,
+                PlaybackErrors.messageFor(PlaybackErrors.Kind.DECODER).primaryAction,
+            )
         }
         getVlcBtn = Button(context).apply {
             text = PlaybackErrors.messageFor(PlaybackErrors.Kind.DECODER).secondaryAction
             isAllCaps = false
-            isFocusable = true
             setOnClickListener {
                 ExternalMediaIntents.open(
                     context,
                     "https://play.google.com/store/apps/details?id=org.videolan.vlc",
                 )
             }
+            FlashbackFocus.decorate(
+                this,
+                FlashbackFocus.Style.SECONDARY,
+                PlaybackErrors.messageFor(PlaybackErrors.Kind.DECODER).secondaryAction,
+            )
         }
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -225,7 +257,13 @@ class RelayVideoPlayerView @JvmOverloads constructor(
                     else -> "OTHER($state)"
                 }
                 Log.i(TAG, "state=$name playWhenReady=${player.playWhenReady} pos=${player.currentPosition}")
+                if (state == Player.STATE_READY) applySubtitleAutoSelect(player.currentTracks)
                 if (state == Player.STATE_ENDED) invokeHandlerProp("onEnded", true)
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                if (released) return
+                applySubtitleAutoSelect(tracks)
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -248,12 +286,19 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         showPlaybackError(PlaybackErrors.messageFor(kind))
     }
 
-    fun bindSrc(src: String, autoPlay: Boolean = true) {
+    fun bindSrc(
+        src: String,
+        autoPlay: Boolean = true,
+        subtitlesJson: String? = null,
+    ) {
         saveChrome.visibility = GONE
         val props = JSONObject()
             .put("src", src)
             .put("controls", true)
             .put("autoPlay", autoPlay)
+        if (!subtitlesJson.isNullOrBlank() && subtitlesJson != "[]") {
+            props.put("subtitlesJson", subtitlesJson)
+        }
         bindProps(props) {}
     }
 
@@ -261,6 +306,47 @@ class RelayVideoPlayerView @JvmOverloads constructor(
     fun setSaveChromeVisible(visible: Boolean) {
         saveChrome.visibility = if (visible) VISIBLE else GONE
     }
+
+    /** True when the bound media advertised at least one sidecar subtitle track. */
+    fun hasSubtitleTracks(): Boolean {
+        val json = propString(propsRef ?: return false, "subtitlesJson") ?: return false
+        return try {
+            JSONArray(json).length() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Open Media3 text-track picker (Off + each sidecar / embedded text track). */
+    fun showSubtitlePicker() {
+        if (released) return
+        try {
+            TrackSelectionDialogBuilder(context, "Subtitles", player, C.TRACK_TYPE_TEXT)
+                .setShowDisableOption(true)
+                .setAllowAdaptiveSelections(false)
+                .build()
+                .show()
+        } catch (e: Exception) {
+            Log.w(TAG, "subtitle picker failed", e)
+            Toast.makeText(context, "Subtitles unavailable", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Keep theater edge chrome in sync: briefly re-show the transport bar. */
+    fun showController() {
+        if (released) return
+        try {
+            playerView.showController()
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Seed D-pad focus onto the Media3 PlayerView (play/pause cluster). */
+    fun requestPlayerFocus() {
+        if (released) return
+        FlashbackFocus.seedFocus(playerView)
+    }
+
     private fun showPlaybackError(msg: PlaybackErrors.Message) {
         try {
             player.pause()
@@ -273,6 +359,7 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         getVlcBtn.text = msg.secondaryAction
         errorOverlay.visibility = VISIBLE
         errorOverlay.bringToFront()
+        FlashbackFocus.seedFocus(openExternalBtn)
     }
 
     private fun hidePlaybackError() {
@@ -356,6 +443,7 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         val src = RelayMediaUrls.resolve(propString(props, "src"))
         if (src != null && src != boundSrc) {
             boundSrc = src
+            autoSubsAppliedFor = null
             Log.i(TAG, "bind src=$src")
             hidePlaybackError()
             val local = MovieDownloadService.fileFor(context, src)
@@ -364,7 +452,8 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             } else {
                 Uri.parse(src)
             }
-            val subs = subtitleConfigs(props)
+            val subPrefs = FlashbackSubtitlePrefs(context)
+            val subs = subtitleConfigs(props, preferEnhanced = subPrefs.preferEnhanced)
             val itemBuilder = MediaItem.Builder()
                 .setUri(uri)
                 .setSubtitleConfigurations(subs)
@@ -373,6 +462,20 @@ class RelayVideoPlayerView @JvmOverloads constructor(
                 itemBuilder.setMimeType(MimeTypes.VIDEO_MATROSKA)
             }
             val item = itemBuilder.build()
+            // Keep text tracks enabled up front; exact track pick runs in applySubtitleAutoSelect.
+            if (subs.isNotEmpty() && subPrefs.autoEnable) {
+                player.trackSelectionParameters = player.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    .setPreferredTextLanguage("en")
+                    .setSelectUndeterminedTextLanguage(true)
+                    .build()
+            } else if (!subPrefs.autoEnable) {
+                player.trackSelectionParameters = player.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
+            }
             // Progressive HTTP for multi‑GB masters — no SimpleCache (avoids thrash).
             // Use bounded Range chunks: full GET / open-ended Range hang on Relay/IPFS edges.
             if (uri.scheme == "file") {
@@ -525,11 +628,102 @@ class RelayVideoPlayerView @JvmOverloads constructor(
         }
     }
 
-    private fun subtitleConfigs(props: JSONObject): List<MediaItem.SubtitleConfiguration> {
+    /**
+     * Couch-readable captions on TV / wide displays; phone keeps ExoPlayer defaults.
+     */
+    private fun styleSubtitleView(pv: PlayerView) {
+        val sub = pv.subtitleView ?: return
+        val uiType = resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+        val tvOrWide = uiType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            resources.configuration.screenWidthDp >= 900
+        if (!tvOrWide) return
+        try {
+            sub.setApplyEmbeddedFontSizes(false)
+            sub.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            sub.setStyle(
+                CaptionStyleCompat(
+                    Color.WHITE,
+                    Color.parseColor("#CC000000"),
+                    Color.TRANSPARENT,
+                    CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                    Color.BLACK,
+                    Typeface.DEFAULT_BOLD,
+                ),
+            )
+            sub.setBottomPaddingFraction(0.08f)
+        } catch (e: Exception) {
+            Log.w(TAG, "subtitleView style failed", e)
+        }
+    }
+
+    /**
+     * Once per [boundSrc]: honor [FlashbackSubtitlePrefs] — enable first/default text track,
+     * or Enhanced / Citations when that preference is on.
+     */
+    private fun applySubtitleAutoSelect(tracks: Tracks) {
+        val src = boundSrc ?: return
+        if (autoSubsAppliedFor == src) return
+        val textGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.length > 0 }
+        if (textGroups.isEmpty()) return
+        autoSubsAppliedFor = src
+
+        val prefs = FlashbackSubtitlePrefs(context)
+        if (!prefs.autoEnable) {
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+            Log.i(TAG, "subtitles auto-enable off — text tracks disabled")
+            return
+        }
+
+        data class Cand(val group: Tracks.Group, val index: Int, val label: String)
+        val cands = ArrayList<Cand>()
+        for (g in textGroups) {
+            for (i in 0 until g.length) {
+                if (!g.isTrackSupported(i)) continue
+                val f = g.getTrackFormat(i)
+                val label = listOfNotNull(f.label, f.language, f.id)
+                    .joinToString(" ")
+                    .ifBlank { "track-$i" }
+                cands.add(Cand(g, i, label))
+            }
+        }
+        if (cands.isEmpty()) return
+
+        val pick = FlashbackSubtitles.preferredIndex(
+            cands.map { it.label },
+            preferEnhanced = prefs.preferEnhanced,
+        ).coerceAtLeast(0)
+        val chosen = cands[pick.coerceAtMost(cands.lastIndex)]
+        val override = TrackSelectionOverride(
+            chosen.group.mediaTrackGroup,
+            listOf(chosen.index),
+        )
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setOverrideForType(override)
+            .setPreferredTextLanguage("en")
+            .setSelectUndeterminedTextLanguage(true)
+            .build()
+        Log.i(
+            TAG,
+            "subtitles auto-select label=${chosen.label} enhancedPref=${prefs.preferEnhanced}",
+        )
+    }
+
+    private fun subtitleConfigs(
+        props: JSONObject,
+        preferEnhanced: Boolean,
+    ): List<MediaItem.SubtitleConfiguration> {
         val json = propString(props, "subtitlesJson") ?: return emptyList()
         return try {
             val arr = JSONArray(json)
-            val out = mutableListOf<MediaItem.SubtitleConfiguration>()
+            val labels = ArrayList<String>()
+            val builders = ArrayList<MediaItem.SubtitleConfiguration.Builder>()
             for (i in 0 until arr.length()) {
                 val t = arr.optJSONObject(i) ?: continue
                 val src = RelayMediaUrls.resolve(t.optString("src")) ?: continue
@@ -538,16 +732,21 @@ class RelayVideoPlayerView @JvmOverloads constructor(
                     src.endsWith(".srt", true) -> MimeTypes.APPLICATION_SUBRIP
                     else -> MimeTypes.TEXT_VTT
                 }
+                val label = t.optString("label").ifBlank { "English" }
+                labels.add(label)
                 val b = MediaItem.SubtitleConfiguration.Builder(Uri.parse(src))
                     .setMimeType(mime)
+                    .setLabel(label)
                 t.optString("lang").takeIf { it.isNotEmpty() }?.let { b.setLanguage(it) }
-                t.optString("label").takeIf { it.isNotEmpty() }?.let { b.setLabel(it) }
-                if (t.optBoolean("default", false)) {
+                builders.add(b)
+            }
+            val prefer = FlashbackSubtitles.preferredIndex(labels, preferEnhanced)
+            builders.mapIndexed { i, b ->
+                if (i == prefer || (prefer < 0 && i == 0)) {
                     b.setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
                 }
-                out.add(b.build())
+                b.build()
             }
-            out
         } catch (e: Exception) {
             Log.w(TAG, "subtitlesJson parse failed", e)
             emptyList()

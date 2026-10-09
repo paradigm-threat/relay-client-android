@@ -15,11 +15,15 @@ import java.net.URL
 /**
  * Remote version metadata for Flashback APK self-update.
  * Served at `{origin}/downloads/flashback.json` (repo-hosted, not IPFS).
+ *
+ * [apkUrl] is the universal / default package. Optional [apkUrls] maps CPU ABI
+ * (`armeabi-v7a`, `arm64-v8a`, …) to smaller split APKs for Fire TV / phones.
  */
 data class RemoteAppVersion(
     val versionCode: Int,
     val versionName: String,
     val apkUrl: String,
+    val apkUrls: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -39,6 +43,7 @@ object FlashbackAppUpdate {
 
     /**
      * Parse site JSON. Requires positive [versionCode]; [apkUrl] may be absolute or site-relative.
+     * Optional [apkUrls] object maps ABI → URL/path.
      * Uses Gson so JVM unit tests do not depend on Android [org.json.JSONObject] stubs.
      */
     fun parseManifest(json: String): RemoteAppVersion? {
@@ -51,7 +56,21 @@ object FlashbackAppUpdate {
                 .ifBlank { code.toString() }
             val apk = o.get("apkUrl")?.takeUnless { it.isJsonNull }?.asString.orEmpty()
                 .ifBlank { "/$DEFAULT_APK_PATH" }
-            RemoteAppVersion(versionCode = code, versionName = name, apkUrl = apk.trim())
+            val apkUrls = linkedMapOf<String, String>()
+            val urlsEl = o.get("apkUrls")
+            if (urlsEl != null && urlsEl.isJsonObject) {
+                for ((k, v) in urlsEl.asJsonObject.entrySet()) {
+                    if (v == null || v.isJsonNull) continue
+                    val s = v.asString.trim()
+                    if (k.isNotBlank() && s.isNotEmpty()) apkUrls[k.trim()] = s
+                }
+            }
+            RemoteAppVersion(
+                versionCode = code,
+                versionName = name,
+                apkUrl = apk.trim(),
+                apkUrls = apkUrls,
+            )
         } catch (_: Exception) {
             null
         }
@@ -60,12 +79,31 @@ object FlashbackAppUpdate {
     fun isOutdated(installedVersionCode: Int, remote: RemoteAppVersion): Boolean =
         remote.versionCode > installedVersionCode
 
-    /** Resolve absolute HTTPS APK URL from origin + manifest field. */
-    fun resolveApkUrl(origin: String, remote: RemoteAppVersion): String {
-        val raw = remote.apkUrl.trim()
-        if (raw.startsWith("http://") || raw.startsWith("https://")) return raw
+    /**
+     * Prefer a split APK matching [preferredAbis] (device [Build.SUPPORTED_ABIS]),
+     * else fall back to [RemoteAppVersion.apkUrl] (universal).
+     */
+    fun resolveApkUrl(
+        origin: String,
+        remote: RemoteAppVersion,
+        preferredAbis: List<String> = emptyList(),
+    ): String {
+        for (abi in preferredAbis) {
+            val candidate = remote.apkUrls[abi]?.trim().orEmpty()
+            if (candidate.isNotEmpty()) return absolutize(origin, candidate)
+        }
+        return absolutize(origin, remote.apkUrl)
+    }
+
+    /** Device ABI list for [resolveApkUrl]; injectable in tests via overload. */
+    fun resolveApkUrlForDevice(origin: String, remote: RemoteAppVersion): String =
+        resolveApkUrl(origin, remote, Build.SUPPORTED_ABIS.toList())
+
+    private fun absolutize(origin: String, raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
         val base = origin.trim().trimEnd('/')
-        return if (raw.startsWith("/")) "$base$raw" else "$base/$raw"
+        return if (trimmed.startsWith("/")) "$base$trimmed" else "$base/$trimmed"
     }
 
     fun fetch(origin: String): RemoteAppVersion? {
