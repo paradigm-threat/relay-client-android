@@ -4,6 +4,29 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// Release signing: prefer android/keystore.properties (gitignored), else -P / env for CI.
+// Local keystore lives outside the repo: ~/.android/flashback-release.keystore
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def releaseStorePath = project.findProperty("KEYSTORE_PATH")
+        ?: System.getenv("KEYSTORE_PATH")
+        ?: keystoreProperties.getProperty("storeFile")
+def releaseStorePassword = project.findProperty("ANDROID_KEYSTORE_PASSWORD")
+        ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        ?: keystoreProperties.getProperty("storePassword")
+def releaseKeyAlias = project.findProperty("ANDROID_KEYSTORE_ALIAS")
+        ?: System.getenv("ANDROID_KEYSTORE_ALIAS")
+        ?: keystoreProperties.getProperty("keyAlias")
+def releaseKeyPassword = project.findProperty("ANDROID_KEY_PASSWORD")
+        ?: System.getenv("ANDROID_KEY_PASSWORD")
+        ?: keystoreProperties.getProperty("keyPassword")
+def hasReleaseSigning = releaseStorePath != null && !releaseStorePath.toString().trim().isEmpty()
+        && releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
+
 android {
     namespace 'com.relay.client'
     compileSdk 33
@@ -11,9 +34,11 @@ android {
     defaultConfig {
         applicationId "com.relay.pure"
         minSdk 24
+        // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
+        // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 13
-        versionName "1.0.13"
+        versionCode 14
+        versionName "1.0.14"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -39,10 +64,25 @@ android {
         buildConfig true
     }
 
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                // Absolute path, or relative to this module (android/app/) for CI.
+                storeFile file(releaseStorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

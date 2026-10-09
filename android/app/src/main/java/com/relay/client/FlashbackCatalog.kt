@@ -33,12 +33,26 @@ data class FlashbackProject(
     }
 
     val isShowing: Boolean get() = status.equals("showing", ignoreCase = true)
+
+    val hasStreamMedia: Boolean
+        get() = media.isNotBlank() || mediaWeb.isNotBlank() || mediaMobile.isNotBlank()
 }
 
+/** Parsed `index.json` — projects plus optional `nowShowing` slug order. */
+data class FlashbackLibrary(
+    val projects: List<FlashbackProject>,
+    val nowShowingSlugs: List<String> = emptyList(),
+)
+
 object FlashbackCatalog {
-    fun fetch(origin: String): List<FlashbackProject> {
+    fun fetch(origin: String): FlashbackLibrary {
         val base = origin.trim().trimEnd('/')
         val text = httpGet("$base/index.json") ?: throw IllegalStateException("Could not load library")
+        return parseIndexJson(text)
+    }
+
+    /** Parse library JSON (unit-testable without network). */
+    fun parseIndexJson(text: String): FlashbackLibrary {
         val root = JSONObject(text)
         val projects = root.optJSONArray("projects") ?: JSONArray()
         val out = ArrayList<FlashbackProject>(projects.length())
@@ -60,7 +74,37 @@ object FlashbackCatalog {
                 ),
             )
         }
-        return out
+        val nowShowing = root.optJSONArray("nowShowing")
+        val slugs = ArrayList<String>()
+        if (nowShowing != null) {
+            for (i in 0 until nowShowing.length()) {
+                val s = nowShowing.optString(i).trim()
+                if (s.isNotEmpty()) slugs.add(s)
+            }
+        }
+        return FlashbackLibrary(out, slugs)
+    }
+
+    /**
+     * Catalog items for Now Showing — same rules as web `nowShowingItemsJson`:
+     * prefer `index.nowShowing` slug order; fall back to `status=showing`.
+     */
+    fun resolveNowShowing(
+        projects: List<FlashbackProject>,
+        nowShowingSlugs: List<String>,
+    ): List<FlashbackProject> {
+        if (nowShowingSlugs.isNotEmpty()) {
+            val bySlug = HashMap<String, FlashbackProject>(projects.size)
+            for (p in projects) {
+                if (p.slug.isNotBlank()) bySlug[p.slug] = p
+            }
+            val out = ArrayList<FlashbackProject>(nowShowingSlugs.size)
+            for (slug in nowShowingSlugs) {
+                bySlug[slug]?.let { out.add(it) }
+            }
+            return out
+        }
+        return projects.filter { it.isShowing }
     }
 
     /** Site markdown (`content/setup.md`, README under a project path, …). */

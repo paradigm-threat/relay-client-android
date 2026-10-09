@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
@@ -15,6 +16,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -27,9 +30,11 @@ import com.clevertree.relayruntime.demo.PlaybackErrors
 import com.clevertree.relayruntime.demo.RelayMarkdownView
 import com.clevertree.relayruntime.demo.RelayMediaUrls
 import com.clevertree.relayruntime.demo.RelayVideoPlayerView
+import java.net.URL
 
 /**
- * Flashback flavor UI without CleverScript: library → title → ownership → ExoPlayer.
+ * Flashback flavor UI without CleverScript: home (Now Showing) → title → ownership → Play.
+ * Affirmation unlocks theater chrome only; playback starts when the user taps Play.
  */
 class FlashbackNativeShell(
     context: Context,
@@ -43,6 +48,7 @@ class FlashbackNativeShell(
     private val gold = Color.parseColor("#e8c872")
 
     private var projects: List<FlashbackProject> = emptyList()
+    private var nowShowingSlugs: List<String> = emptyList()
     private var selected: FlashbackProject? = null
     private var playerView: RelayVideoPlayerView? = null
     private var inTheater: Boolean = false
@@ -57,9 +63,9 @@ class FlashbackNativeShell(
         showLoading("Loading library…")
         Thread {
             try {
-                val list = FlashbackCatalog.fetch(origin)
+                val library = FlashbackCatalog.fetch(origin)
                 main.post {
-                    projects = list
+                    applyLibrary(library)
                     showLibrary()
                     maybeCheckForUpdates(silent = true)
                 }
@@ -70,6 +76,11 @@ class FlashbackNativeShell(
                 }
             }
         }.start()
+    }
+
+    private fun applyLibrary(library: FlashbackLibrary) {
+        projects = library.projects
+        nowShowingSlugs = library.nowShowingSlugs
     }
 
     fun onConfigurationChanged() {
@@ -111,9 +122,9 @@ class FlashbackNativeShell(
                 showLoading("Loading library…")
                 Thread {
                     try {
-                        val list = FlashbackCatalog.fetch(origin)
+                        val library = FlashbackCatalog.fetch(origin)
                         main.post {
-                            projects = list
+                            applyLibrary(library)
                             showLibrary()
                         }
                     } catch (e: Exception) {
@@ -143,6 +154,12 @@ class FlashbackNativeShell(
             ),
         )
 
+        val showing = FlashbackCatalog.resolveNowShowing(projects, nowShowingSlugs)
+        if (showing.isNotEmpty()) {
+            col.addView(sectionTitle("Now Showing"))
+            col.addView(nowShowingRow(showing))
+        }
+
         val mixes = projects.filter { it.category == "FanMixes" }
         val kids = projects.filter { it.category == "KidFriendly" }
         if (mixes.isNotEmpty()) {
@@ -153,10 +170,61 @@ class FlashbackNativeShell(
             col.addView(sectionTitle("KidFriendly"))
             for (p in kids) col.addView(projectRow(p))
         }
-        if (mixes.isEmpty() && kids.isEmpty()) {
+        if (showing.isEmpty() && mixes.isEmpty() && kids.isEmpty()) {
             col.addView(body("No titles in the catalog yet."))
         }
         wrapScroll(col)
+    }
+
+    /** Horizontal poster strip — web Now Showing carousel analogue. */
+    private fun nowShowingRow(items: List<FlashbackProject>): View {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(4), 0, dp(8))
+        }
+        for (p in items) {
+            row.addView(nowShowingCard(p))
+        }
+        return HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+    }
+
+    private fun nowShowingCard(p: FlashbackProject): View {
+        val cardW = dp(120)
+        val posterH = dp(180)
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(cardW, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(12)
+            }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showTitle(p) }
+            val poster = ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(cardW, posterH)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(Color.parseColor("#2a1018"))
+                contentDescription = p.title
+            }
+            addView(poster)
+            loadPoster(poster, p.posterUrl(origin))
+            addView(
+                TextView(context).apply {
+                    text = p.title
+                    setTextColor(gold)
+                    textSize = 13f
+                    typeface = Typeface.SERIF
+                    maxLines = 3
+                    setPadding(0, dp(6), 0, 0)
+                },
+            )
+        }
     }
 
     /** Site pages the web exposes as markdown — rendered via [RelayMarkdownView]. */
@@ -199,18 +267,11 @@ class FlashbackNativeShell(
     private fun showTitle(p: FlashbackProject) {
         selected = p
         clear()
-
-        val movieAck = FlashbackOwnership.hasAck(context, FlashbackOwnership.movieKey(p.slug))
-        if (movieAck) {
-            val stream = p.masterStreamUrl(origin)
-            if (!stream.isNullOrBlank()) {
-                showTheater(p, stream)
-                return
-            }
-        }
-
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
+
+        val movieAck = FlashbackOwnership.hasAck(context, FlashbackOwnership.movieKey(p.slug))
+        val stream = p.masterStreamUrl(origin)
 
         val col = column()
         col.addView(
@@ -233,6 +294,20 @@ class FlashbackNativeShell(
             )
         }
 
+        val posterUrl = p.posterUrl(origin)
+        if (!posterUrl.isNullOrBlank()) {
+            val poster = ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(200), dp(300)).apply {
+                    bottomMargin = dp(12)
+                }
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(Color.parseColor("#2a1018"))
+                contentDescription = p.title
+            }
+            col.addView(poster)
+            loadPoster(poster, posterUrl)
+        }
+
         if (!movieAck) {
             col.addView(sectionTitle("CONFIRM"))
             col.addView(
@@ -241,11 +316,44 @@ class FlashbackNativeShell(
                 ),
             )
             col.addView(
+                body(
+                    "Same house rule fanedit communities have used for years: the edit is for people who already have the movie.",
+                ),
+            )
+            col.addView(
                 primaryButton("OK — I confirm") {
                     FlashbackHits.acknowledgeTitle(context, origin, p.slug)
+                    // Stay on the movie page — do not autoplay (web: gate unlocks chrome; Play is separate).
                     showTitle(p)
                 },
             )
+            col.addView(
+                linkRow(
+                    "Ownership policy" to { showMarkdownDoc("Ownership", "content/legal.md") },
+                    "Terms" to { showMarkdownDoc("Terms", "content/terms.md") },
+                ),
+            )
+        } else if (!stream.isNullOrBlank()) {
+            col.addView(sectionTitle("Watch"))
+            col.addView(
+                primaryButton("Play") {
+                    showTheater(p, stream)
+                },
+            )
+            col.addView(
+                secondaryButton("Open in external player") {
+                    if (!ExternalMediaIntents.open(context, stream)) {
+                        Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
+            col.addView(
+                secondaryButton("Get VLC") {
+                    openSitePath("https://play.google.com/store/apps/details?id=org.videolan.vlc")
+                },
+            )
+        } else if (p.hasStreamMedia) {
+            col.addView(body("Feature media is catalogued but the stream URL could not be built."))
         } else {
             col.addView(body("Feature media is not catalogued for streaming yet."))
         }
@@ -282,13 +390,13 @@ class FlashbackNativeShell(
 
         root.addView(
             TextView(context).apply {
-                text = "← Library"
+                text = "← Back"
                 setTextColor(gold)
                 textSize = 14f
                 setPadding(dp(12), dp(10), dp(12), dp(10))
                 setBackgroundColor(Color.parseColor("#990d0505"))
                 isClickable = true
-                setOnClickListener { showLibrary() }
+                setOnClickListener { showTitle(p) }
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -455,16 +563,34 @@ class FlashbackNativeShell(
     }
 
     private fun openSitePath(path: String) {
-        val base = origin.trim().trimEnd('/')
-        val rel = if (path.startsWith("/")) path else "/$path"
-        val uri = Uri.parse("$base$rel")
+        val uri = if (path.startsWith("http://") || path.startsWith("https://")) {
+            Uri.parse(path)
+        } else {
+            val base = origin.trim().trimEnd('/')
+            val rel = if (path.startsWith("/")) path else "/$path"
+            Uri.parse("$base$rel")
+        }
         try {
             context.startActivity(
                 Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         } catch (_: Exception) {
-            Toast.makeText(context, "Could not open $rel", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Could not open link", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun loadPoster(view: ImageView, src: String?) {
+        val url = src?.trim().orEmpty()
+        if (url.isEmpty()) return
+        Thread {
+            try {
+                val bytes = URL(url).openStream().use { it.readBytes() }
+                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@Thread
+                main.post { view.setImageBitmap(bmp) }
+            } catch (_: Exception) {
+                /* poster is decorative */
+            }
+        }.start()
     }
 
     /**
