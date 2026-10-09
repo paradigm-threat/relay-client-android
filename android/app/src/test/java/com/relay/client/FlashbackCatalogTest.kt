@@ -74,6 +74,44 @@ class FlashbackCatalogTest {
     }
 
     @Test
+    fun masterStreamUrlPrefersIpfsCid() {
+        val p = FlashbackProject(
+            slug = "the-mummy-1999-debugged",
+            category = "FanMixes",
+            path = "FanMixes/The Mummy (1999) - Debugged",
+            title = "Mummy",
+            originalTitle = "Mummy",
+            status = "showing",
+            media = "The Mummy Debugged.mkv",
+            mediaWeb = "",
+            mediaMobile = "",
+            image = "",
+            blurb = "",
+            ipfsCid = "bafybeicfynx4o23njy4owttcziexmm4f6ibnqceharrhoxsvsbaaax7rxq",
+        )
+        assertEquals(
+            "https://flashbackrepository.org/ipfs/bafybeicfynx4o23njy4owttcziexmm4f6ibnqceharrhoxsvsbaaax7rxq",
+            p.masterStreamUrl("https://flashbackrepository.org/"),
+        )
+    }
+
+    @Test
+    fun parseAssetsManifestCidsMapsPaths() {
+        val json =
+            """
+            {"schema":"x","assets":[
+              {"path":"FanMixes/The Mummy (1999) - Debugged/The Mummy Debugged.mkv",
+               "ipfs":"bafybeicfynx4o23njy4owttcziexmm4f6ibnqceharrhoxsvsbaaax7rxq"}
+            ]}
+            """.trimIndent()
+        val map = FlashbackCatalog.parseAssetsManifestCids(json)
+        assertEquals(
+            "bafybeicfynx4o23njy4owttcziexmm4f6ibnqceharrhoxsvsbaaax7rxq",
+            map["FanMixes/The Mummy (1999) - Debugged/The Mummy Debugged.mkv"],
+        )
+    }
+
+    @Test
     fun posterUrlEncodesRelativePath() {
         val p = FlashbackProject(
             slug = "x",
@@ -135,6 +173,36 @@ class FlashbackCatalogTest {
             availableIn = "2160p HEVC MKV (AAC)",
         )
         assertEquals("edit 1:50:25 · cut 0:14:24 · 2160p HEVC MKV (AAC)", p.statsLine())
+    }
+
+    @Test
+    fun parseIndexJsonReadsSubtitlesJson() {
+        val json = """
+            {
+              "nowShowing": ["the-mummy-1999-debugged"],
+              "projects": [{
+                "slug": "the-mummy-1999-debugged",
+                "category": "FanMixes",
+                "path": "FanMixes/The Mummy (1999) - Debugged",
+                "title": "The Mummy (1999) — Debugged",
+                "originalTitle": "The Mummy (1999)",
+                "status": "showing",
+                "media": "The Mummy Debugged.mkv",
+                "mediaWeb": "",
+                "mediaMobile": "",
+                "image": "",
+                "blurb": "",
+                "subtitlesJson": "[{\"src\":\"/FanMixes/The Mummy (1999) - Debugged/subs/The Mummy Debugged.english.vtt\",\"label\":\"English (default)\",\"lang\":\"en\",\"default\":true},{\"src\":\"/FanMixes/The Mummy (1999) - Debugged/subs/The Mummy Debugged.enhanced.vtt\",\"label\":\"Enhanced / Citations\",\"lang\":\"en\"}]"
+              }]
+            }
+        """.trimIndent()
+        val lib = FlashbackCatalog.parseIndexJson(json)
+        assertEquals(1, lib.projects.size)
+        val p = lib.projects[0]
+        assertTrue(p.subtitlesJson.contains("english.vtt"))
+        assertTrue(p.subtitlesJson.contains("enhanced.vtt"))
+        assertTrue(p.subtitlesJson.contains("English (default)"))
+        assertTrue(p.subtitlesJson.contains("Enhanced / Citations"))
     }
 
     @Test

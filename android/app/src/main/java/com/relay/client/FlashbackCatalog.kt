@@ -18,11 +18,18 @@ data class FlashbackProject(
     val mediaMobile: String,
     val image: String,
     val blurb: String,
+    /** Ready JSON array string for Media3 sidecar tracks (from index.json). */
+    val subtitlesJson: String = "[]",
     /** From project `stats.json` via index.json (optional). */
     val faneditRuntime: String = "",
     val timeCut: String = "",
     val availableIn: String = "",
     val filmRuntime: String = "",
+    /**
+     * IPFS CID from `assets.manifest.json` when the logical tip path is a thin pointer.
+     * Prefer `/ipfs/{cid}` for progressive Range (gateway path→CID can 404 while CID works).
+     */
+    val ipfsCid: String = "",
 ) {
     /** Compact stats line for title / Now Showing meta. */
     fun statsLine(): String {
@@ -33,8 +40,17 @@ data class FlashbackProject(
         return parts.joinToString(" · ")
     }
 
-    /** Progressive HTTPS master URL with percent-encoded path segments (spaces, etc.). */
+    /**
+     * Progressive HTTPS master URL.
+     * Uses `/ipfs/{cid}` when [ipfsCid] is set (thin IPFS masters); otherwise tip path.
+     */
     fun masterStreamUrl(origin: String): String? {
+        if (media.isBlank() && ipfsCid.isBlank()) return null
+        val base = origin.trim().trimEnd('/')
+        val cid = ipfsCid.trim()
+        if (cid.isNotEmpty()) {
+            return "$base/ipfs/$cid"
+        }
         if (media.isBlank()) return null
         return FlashbackCatalog.joinOriginPath(origin, path, media)
     }
@@ -62,7 +78,16 @@ object FlashbackCatalog {
     fun fetch(origin: String): FlashbackLibrary {
         val base = origin.trim().trimEnd('/')
         val text = httpGet("$base/index.json") ?: throw IllegalStateException("Could not load library")
-        return parseIndexJson(text)
+        val library = parseIndexJson(text)
+        val manifestText = httpGet("$base/assets.manifest.json")
+        val cidByPath = parseAssetsManifestCids(manifestText)
+        if (cidByPath.isEmpty()) return library
+        val merged = library.projects.map { p ->
+            val key = "${p.path.trim().trimEnd('/')}/${p.media.trim().trimStart('/')}"
+            val cid = cidByPath[key] ?: cidByPath[key.trimStart('/')]
+            if (cid.isNullOrBlank()) p else p.copy(ipfsCid = cid)
+        }
+        return library.copy(projects = merged)
     }
 
     /** Parse library JSON (unit-testable without network). */
@@ -85,10 +110,12 @@ object FlashbackCatalog {
                     mediaMobile = o.optString("mediaMobile"),
                     image = o.optString("image"),
                     blurb = o.optString("blurb"),
+                    subtitlesJson = o.optString("subtitlesJson").ifBlank { "[]" },
                     faneditRuntime = o.optString("faneditRuntime"),
                     timeCut = o.optString("timeCut"),
                     availableIn = o.optString("availableIn"),
                     filmRuntime = o.optString("filmRuntime"),
+                    ipfsCid = o.optString("ipfsCid"),
                 ),
             )
         }
@@ -101,6 +128,28 @@ object FlashbackCatalog {
             }
         }
         return FlashbackLibrary(out, slugs)
+    }
+
+    /**
+     * Map catalog media path → CID from `assets.manifest.json`.
+     * Paths are normalized without a leading slash.
+     */
+    fun parseAssetsManifestCids(text: String?): Map<String, String> {
+        if (text.isNullOrBlank()) return emptyMap()
+        return try {
+            val root = JSONObject(text)
+            val assets = root.optJSONArray("assets") ?: return emptyMap()
+            val out = HashMap<String, String>(assets.length())
+            for (i in 0 until assets.length()) {
+                val a = assets.optJSONObject(i) ?: continue
+                val path = a.optString("path").trim().trimStart('/')
+                val cid = a.optString("ipfs").trim()
+                if (path.isNotEmpty() && cid.isNotEmpty()) out[path] = cid
+            }
+            out
+        } catch (_: Exception) {
+            emptyMap()
+        }
     }
 
     /**

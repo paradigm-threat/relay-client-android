@@ -37,8 +37,8 @@ android {
         // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
         // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 18
-        versionName "1.0.18"
+        versionCode 19
+        versionName "1.0.19"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -171,6 +171,8 @@ dependencies {
     // Unit testing
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.jetbrains.kotlin:kotlin-test:1.8.21"
+    // JVM unit tests: Android stub org.json is not mocked — use the real library.
+    testImplementation "org.json:json:20231013"
 
     // Instrumentation testing
     androidTestImplementation "androidx.test:runner:1.5.2"
