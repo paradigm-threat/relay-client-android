@@ -819,6 +819,221 @@ class FlashbackNativeShell(
         }
     }
 
+    private fun buildBugReportFooter(): View {
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#2a1018"))
+            setPadding(dp(14), dp(12), dp(10), dp(12))
+            elevation = dp(8).toFloat()
+            addView(
+                TextView(context).apply {
+                    text = "Submit a bug report"
+                    setTextColor(gold)
+                    textSize = 15f
+                    typeface = Typeface.DEFAULT_BOLD
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { showBugReportForm() }
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                },
+            )
+            addView(
+                TextView(context).apply {
+                    text = "✕"
+                    setTextColor(creamMuted)
+                    textSize = 18f
+                    contentDescription = "Dismiss bug report bar"
+                    setPadding(dp(12), dp(4), dp(8), dp(4))
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        bugFooterDismissedThisSession = true
+                        FlashbackBugReport.markFooterDismissed(context)
+                        refreshBugFooterVisibility()
+                    }
+                },
+            )
+        }
+    }
+
+    private fun refreshBugFooterVisibility() {
+        val show = !inTheater &&
+            currentScreen != "bug-report" &&
+            !bugFooterDismissedThisSession &&
+            FlashbackBugReport.shouldShowFooter(context)
+        bugFooter.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    private fun boardPagePath(): String {
+        val slug = selected?.slug?.trim().orEmpty()
+        return if (slug.isNotEmpty()) "/$slug" else "/android"
+    }
+
+    private fun collectDebugSnapshot(): FlashbackBugReport.DebugSnapshot {
+        return FlashbackBugReport.DebugSnapshot(
+            versionName = BuildConfig.VERSION_NAME,
+            versionCode = BuildConfig.VERSION_CODE,
+            packageName = context.packageName,
+            deviceModel = FlashbackBugReport.deviceModelLabel(),
+            sdkInt = android.os.Build.VERSION.SDK_INT,
+            origin = origin.trim().trimEnd('/'),
+            screen = currentScreen,
+            slug = selected?.slug,
+            lastPlaybackError = lastPlaybackError,
+            logcatSnippet = FlashbackBugReport.readLogcatSnippet(),
+        )
+    }
+
+    private fun showBugReportForm() {
+        clear()
+        currentScreen = "bug-report"
+        inTheater = false
+        activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        exitImmersive()
+        setDrawerEnabled(true)
+        refreshBugFooterVisibility()
+
+        val col = column()
+        col.addView(
+            TextView(context).apply {
+                text = "← Back"
+                setTextColor(gold)
+                textSize = 15f
+                isClickable = true
+                setOnClickListener {
+                    val sel = selected
+                    if (sel != null) showTitle(sel) else showLibrary()
+                }
+                setPadding(0, 0, 0, dp(12))
+            },
+        )
+        col.addView(heading("Report a bug"))
+        col.addView(
+            body(
+                "Posts publicly on the git comments branch (same Board as the website). " +
+                    "A short Android debug snapshot is attached automatically.",
+            ),
+        )
+
+        val titleInput = EditText(context).apply {
+            hint = "Title"
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+            setBackgroundColor(Color.parseColor("#1a0a0c"))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setSingleLine(true)
+        }
+        col.addView(
+            TextView(context).apply {
+                text = "Title"
+                setTextColor(creamMuted)
+                textSize = 13f
+                setPadding(0, dp(8), 0, dp(4))
+            },
+        )
+        col.addView(titleInput)
+
+        val bodyInput = EditText(context).apply {
+            hint = "What happened?"
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+            setBackgroundColor(Color.parseColor("#1a0a0c"))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            minLines = 5
+            gravity = Gravity.TOP or Gravity.START
+        }
+        col.addView(
+            TextView(context).apply {
+                text = "Message"
+                setTextColor(creamMuted)
+                textSize = 13f
+                setPadding(0, dp(12), 0, dp(4))
+            },
+        )
+        col.addView(bodyInput)
+
+        val nameInput = EditText(context).apply {
+            hint = "Optional"
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+            setBackgroundColor(Color.parseColor("#1a0a0c"))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setSingleLine(true)
+        }
+        col.addView(
+            TextView(context).apply {
+                text = "Name (optional)"
+                setTextColor(creamMuted)
+                textSize = 13f
+                setPadding(0, dp(12), 0, dp(4))
+            },
+        )
+        col.addView(nameInput)
+
+        val status = TextView(context).apply {
+            setTextColor(creamMuted)
+            textSize = 14f
+            setPadding(0, dp(10), 0, 0)
+        }
+        val submit = primaryButton("Post publicly") {}
+        submit.setOnClickListener {
+            val title = titleInput.text?.toString().orEmpty()
+            val message = bodyInput.text?.toString().orEmpty()
+            val name = nameInput.text?.toString().orEmpty()
+            submit.isEnabled = false
+            status.setTextColor(creamMuted)
+            status.text = "Posting…"
+            Thread {
+                val result = FlashbackBugReport.submit(
+                    origin,
+                    FlashbackBugReport.SubmitRequest(
+                        title = title,
+                        body = message,
+                        name = name,
+                        pagePath = boardPagePath(),
+                        snapshot = collectDebugSnapshot(),
+                    ),
+                )
+                main.post {
+                    submit.isEnabled = true
+                    when (result) {
+                        is FlashbackBugReport.SubmitResult.Ok -> {
+                            status.setTextColor(gold)
+                            status.text =
+                                "Posted. Thank you — it is public on the comments branch."
+                            bodyInput.setText("")
+                            titleInput.setText("")
+                        }
+                        is FlashbackBugReport.SubmitResult.ValidationError -> {
+                            status.setTextColor(Color.parseColor("#e8a0a0"))
+                            status.text = result.message
+                        }
+                        is FlashbackBugReport.SubmitResult.HttpError -> {
+                            status.setTextColor(Color.parseColor("#e8a0a0"))
+                            status.text =
+                                "Could not post (HTTP ${result.status}: ${result.detail}). " +
+                                    "This site’s publish node must accept PUT on branch comments."
+                        }
+                        is FlashbackBugReport.SubmitResult.NetworkError -> {
+                            status.setTextColor(Color.parseColor("#e8a0a0"))
+                            status.text =
+                                "Could not post (${result.message}). Check your connection and try again."
+                        }
+                    }
+                }
+            }.start()
+        }
+        col.addView(submit)
+        col.addView(status)
+        col.addView(
+            linkRow(
+                "View public Board" to { openSitePath("/board?kind=bug") },
+            ),
+        )
+        wrapScroll(col)
+    }
+
     private fun loadPoster(view: ImageView, src: String?) {
         val url = src?.trim().orEmpty()
         if (url.isEmpty()) return
@@ -1015,8 +1230,8 @@ class FlashbackNativeShell(
                 },
             )
         }
-        // column() already pads; strip top padding clash with hamburger bar
-        col.setPadding(dp(18), dp(4), dp(18), dp(40))
+        // Extra bottom pad so the floating bug-report footer does not cover the last controls.
+        col.setPadding(dp(18), dp(4), dp(18), dp(72))
         contentHost.addView(root)
     }
 
@@ -1120,120 +1335,6 @@ class FlashbackNativeShell(
     }
 
     private fun activity(): AppCompatActivity? = context as? AppCompatActivity
-
-    private fun buildBugReportFooter(): View {
-        val bar = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#cc1a0a0c"))
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            visibility = View.GONE
-        }
-        bar.addView(
-            TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                text = "Found a bug? Report it on the board."
-                setTextColor(creamMuted)
-                textSize = 13f
-            },
-        )
-        bar.addView(
-            TextView(context).apply {
-                text = "Report"
-                setTextColor(gold)
-                textSize = 14f
-                setPadding(dp(8), 0, dp(8), 0)
-                isClickable = true
-                setOnClickListener { showBugReportForm() }
-            },
-        )
-        bar.addView(
-            TextView(context).apply {
-                text = "✕"
-                setTextColor(creamMuted)
-                textSize = 16f
-                isClickable = true
-                setOnClickListener {
-                    bugFooterDismissedThisSession = true
-                    FlashbackBugReport.markFooterDismissed(context)
-                    refreshBugFooterVisibility()
-                }
-            },
-        )
-        return bar
-    }
-
-    private fun refreshBugFooterVisibility() {
-        val show = !inTheater &&
-            !bugFooterDismissedThisSession &&
-            FlashbackBugReport.shouldShowFooter(context)
-        bugFooter.visibility = if (show) View.VISIBLE else View.GONE
-    }
-
-    private fun showBugReportForm() {
-        val titleField = EditText(context).apply {
-            hint = "Short title"
-            setTextColor(cream)
-            setHintTextColor(creamMuted)
-        }
-        val bodyField = EditText(context).apply {
-            hint = "What happened?"
-            minLines = 4
-            gravity = Gravity.TOP
-            setTextColor(cream)
-            setHintTextColor(creamMuted)
-        }
-        val form = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), 0)
-            addView(titleField)
-            addView(bodyField)
-        }
-        AlertDialog.Builder(context)
-            .setTitle("Bug report")
-            .setView(form)
-            .setPositiveButton("Send") { _, _ ->
-                val snap = FlashbackBugReport.DebugSnapshot(
-                    versionName = BuildConfig.VERSION_NAME,
-                    versionCode = BuildConfig.VERSION_CODE,
-                    packageName = context.packageName,
-                    deviceModel = FlashbackBugReport.deviceModelLabel(),
-                    sdkInt = android.os.Build.VERSION.SDK_INT,
-                    origin = origin,
-                    screen = currentScreen,
-                    slug = selected?.slug,
-                    lastPlaybackError = lastPlaybackError,
-                    logcatSnippet = FlashbackBugReport.readLogcatSnippet(),
-                )
-                val req = FlashbackBugReport.SubmitRequest(
-                    title = titleField.text?.toString().orEmpty(),
-                    body = bodyField.text?.toString().orEmpty(),
-                    pagePath = "/android",
-                    snapshot = snap,
-                )
-                Thread {
-                    val result = FlashbackBugReport.submit(origin, req)
-                    main.post {
-                        when (result) {
-                            is FlashbackBugReport.SubmitResult.Ok ->
-                                Toast.makeText(context, "Thanks — report posted.", Toast.LENGTH_LONG).show()
-                            is FlashbackBugReport.SubmitResult.ValidationError ->
-                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                            is FlashbackBugReport.SubmitResult.HttpError ->
-                                Toast.makeText(
-                                    context,
-                                    "Server error (${result.status}): ${result.detail.take(120)}",
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            is FlashbackBugReport.SubmitResult.NetworkError ->
-                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }.start()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
 
     private fun dp(v: Int): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()

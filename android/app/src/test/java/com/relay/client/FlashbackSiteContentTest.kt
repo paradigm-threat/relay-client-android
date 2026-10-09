@@ -23,6 +23,9 @@ class FlashbackSiteContentTest {
             ),
             ids,
         )
+        val board = FlashbackSiteContent.drawerItems.first { it.id == "board" }
+        assertEquals("Report a bug", board.title)
+        assertTrue(board.action is FlashbackSiteContent.NavAction.Board)
     }
 
     @Test

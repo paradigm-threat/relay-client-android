@@ -263,21 +263,46 @@ object FlashbackBugReport {
         )
         val url = putUrl(origin, filePath)
         return try {
-            putMarkdown(url, markdown)
-                .fold(
-                    onSuccess = { SubmitResult.Ok(filePath) },
-                    onFailure = { err ->
-                        val http = err as? HttpStatusException
-                        if (http != null) {
-                            SubmitResult.HttpError(http.status, http.detail)
-                        } else {
-                            SubmitResult.NetworkError(err.message ?: "network error")
-                        }
-                    },
-                )
+            // Fleet DNS may hit a non-publish node (403). Retry same origin a few times;
+            // do not PUT to bare publish_origin hostnames — wrong Host → wrong repo.
+            var lastErr: Throwable? = null
+            repeat(3) { attempt ->
+                val result = putMarkdown(url, markdown)
+                val ok = result.getOrNull()
+                if (ok != null) return SubmitResult.Ok(filePath)
+                lastErr = result.exceptionOrNull()
+                val http = lastErr as? HttpStatusException
+                val retryable = http != null && http.status == 403 &&
+                    http.detail.contains("publish_origin=")
+                if (!retryable || attempt == 2) {
+                    return mapPutFailure(lastErr ?: Exception("PUT failed"))
+                }
+            }
+            mapPutFailure(lastErr ?: Exception("PUT failed"))
         } catch (e: Exception) {
             SubmitResult.NetworkError(e.message ?: "network error")
         }
+    }
+
+    private fun mapPutFailure(err: Throwable): SubmitResult {
+        val http = err as? HttpStatusException
+        return if (http != null) {
+            val detail = if (http.status == 403 && http.detail.contains("publish_origin=")) {
+                "Edge node refused the write (not the publish origin). Try again — " +
+                    http.detail.take(240)
+            } else {
+                http.detail
+            }
+            SubmitResult.HttpError(http.status, detail)
+        } else {
+            SubmitResult.NetworkError(err.message ?: "network error")
+        }
+    }
+
+    /** Parse `publish_origin=host.example` from fleet 403 bodies (tests / diagnostics). */
+    fun parsePublishOriginHost(detail: String): String? {
+        val m = Regex("""publish_origin=([A-Za-z0-9.-]+)""").find(detail) ?: return null
+        return m.groupValues[1].trim().ifEmpty { null }
     }
 
     private class HttpStatusException(val status: Int, val detail: String) :
