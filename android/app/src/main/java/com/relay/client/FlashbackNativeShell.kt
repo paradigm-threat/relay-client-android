@@ -791,7 +791,11 @@ class FlashbackNativeShell(
         refreshBugFooterVisibility()
 
         val movieAck = FlashbackOwnership.hasAck(context, FlashbackOwnership.movieKey(p.slug))
-        val ladder = FlashbackStreamLadder.options(p, origin)
+        // Stream ladder only for Now showing (bytes on this server). Others: IPFS download.
+        val onServer =
+            p.isShowing || nowShowingSlugs.any { it.equals(p.slug, ignoreCase = true) }
+        val ladder =
+            if (onServer) FlashbackStreamLadder.options(p, origin) else emptyList()
         val hevc = HevcCapability.probe()
         val preferredIdx = FlashbackStreamLadder.preferredIndex(
             ladder,
@@ -903,17 +907,17 @@ class FlashbackNativeShell(
         val keepCid = (preferred?.cid ?: "").ifBlank { p.ipfsCid }.trim()
         val inCatalog = keepCid.length >= 8
         val streamUrl = preferred?.url.orEmpty()
-        val hasStreamUrl = streamUrl.isNotEmpty()
+        val hasStreamUrl = catalogShowing && streamUrl.isNotEmpty()
         var seed: View? = null
 
         host.addView(sectionTitle("Ways to watch"))
         host.addView(
-            body("Stream when this server has the file, download via IPFS when catalogued, or request Drive links."),
+            body("Stream when this server has the file (Now showing), download via IPFS when catalogued, or request Drive links."),
         )
 
         host.addView(sectionTitle("1. Stream it now"))
         host.addView(
-            body("Works for Now showing titles, or when the site gateway already has the bytes."),
+            body("Only for Now showing titles — those files are uploaded on this server."),
         )
         if (preferred != null &&
             !hevc.canDecodeHeight(p.height) &&
@@ -930,9 +934,10 @@ class FlashbackNativeShell(
         val streamControls = ArrayList<View>()
         val streamStatus = body(
             when {
-                !hasStreamUrl -> "No stream URL for this title yet."
-                catalogShowing -> "Ready on this server (Now showing)."
-                else -> "Checking if this server has the file…"
+                catalogShowing && hasStreamUrl -> "Ready on this server (Now showing)."
+                catalogShowing -> "No stream URL for this title yet."
+                else ->
+                    "Not on this server (not Now showing). Use Download via IPFS or Request Drive links."
             },
         )
         var streamReady = catalogShowing && hasStreamUrl
@@ -944,7 +949,7 @@ class FlashbackNativeShell(
             }
         }
 
-        if (preferred != null) {
+        if (preferred != null && catalogShowing) {
             val play = primaryButton("Play · ${preferred.label}") {
                 if (!streamReady) {
                     Toast.makeText(
@@ -1002,32 +1007,9 @@ class FlashbackNativeShell(
             }
             host.addView(openExternal)
             streamControls.add(openExternal)
-        } else if (p.hasStreamMedia) {
-            host.addView(body("Feature media is catalogued but the stream URL could not be built."))
-        } else {
-            host.addView(body("Feature media is not catalogued for streaming yet."))
         }
         host.addView(streamStatus)
         applyStreamEnabled(streamReady)
-
-        if (hasStreamUrl && !catalogShowing) {
-            Thread {
-                val probe = FlashbackAssetStatus.probeUrl(streamUrl)
-                main.post {
-                    if (selected?.slug != p.slug || currentScreen != "title") return@post
-                    if (probe.ready) {
-                        streamStatus.text = "Ready on this server."
-                        applyStreamEnabled(true)
-                    } else {
-                        streamStatus.text =
-                            "Not on this server right now. Try Download (if listed) or Request Drive links."
-                        applyStreamEnabled(false)
-                    }
-                }
-            }.start()
-        } else if (!hasStreamUrl) {
-            applyStreamEnabled(false)
-        }
 
         host.addView(sectionTitle("2. Download the file"))
         host.addView(
