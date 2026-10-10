@@ -654,7 +654,7 @@ class FlashbackNativeShell(
                 )
                 addView(
                     TextView(context).apply {
-                        text = "Reasserting our 1st Amendment Rights one Movie at a time"
+                        text = "Reaffirming our First Amendment one Movie at a time"
                         setTextColor(creamMuted)
                         textSize = 11f
                         maxLines = 2
