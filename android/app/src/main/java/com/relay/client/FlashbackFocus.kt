@@ -36,8 +36,13 @@ object FlashbackFocus {
             v.scaleY = if (hasFocus) 1.03f else 1f
             if (hasFocus) ensureVisibleInScrollParents(v)
         }
-        val min = (48 * view.resources.displayMetrics.density).toInt()
-        if (view.minimumHeight < min) view.minimumHeight = min
+        // Chips (Back / CC / Browser / …) stay compact — 48dp min leaves a dead gap under the label.
+        if (style != Style.CHIP) {
+            val min = (48 * view.resources.displayMetrics.density).toInt()
+            if (view.minimumHeight < min) view.minimumHeight = min
+        } else {
+            view.minimumHeight = 0
+        }
     }
 
     fun seedFocus(preferred: View?) {

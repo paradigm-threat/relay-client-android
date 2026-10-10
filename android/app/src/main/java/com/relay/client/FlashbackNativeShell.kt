@@ -381,20 +381,17 @@ class FlashbackNativeShell(
         selected = null
         refreshBugFooterVisibility()
         val col = column()
-        col.addView(heading("Flashback Repository"))
-        col.addView(body("Own the original. Then improve it."))
-        updateBanner()?.let { col.addView(it) }
-        // Widescreen: nav lives in the docked left menu — skip duplicate in-page links.
-        if (!wideLayout) col.addView(siteMenuRow())
-
+        // Brand lives in the header (topBar). App / Setup / Legal / Why / Request are in the menu.
+        // First content matches the website: Now showing, then the rest of the library.
         var firstFocus: View? = null
         val showing = FlashbackCatalog.resolveNowShowing(projects, nowShowingSlugs)
         if (showing.isNotEmpty()) {
-            col.addView(sectionTitle("Now Showing"))
+            col.addView(sectionTitle("Now showing"))
             val strip = nowShowingRow(showing)
             col.addView(strip)
             firstFocus = findFirstFocusable(strip)
         }
+        updateBanner()?.let { col.addView(it) }
 
         val mixes = projects.filter { it.category == "FanMixes" }
         val kids = projects.filter { it.category == "KidFriendly" }
@@ -531,16 +528,6 @@ class FlashbackNativeShell(
         }
     }
 
-    /** Compact in-page shortcuts (full list is in the navigation drawer). */
-    private fun siteMenuRow(): LinearLayout =
-        linkRow(
-            "App" to { showMarkdownDoc("Flashback App", "content/app.md") },
-            "Setup" to { showMarkdownDoc("Setup for playback", "content/setup.md") },
-            "Legal" to { showMarkdownDoc("Ownership policy", "content/legal.md") },
-            "Why" to { showMarkdownDoc("Why we’re doing this", "content/motivation.md") },
-            "Request" to { showMarkdownDoc("Request downloads", "content/request.md") },
-        )
-
     private fun buildNavDrawer(): View {
         val scroll = ScrollView(context).apply {
             background = FlashbackTheaterChrome.sidebarBackground()
@@ -617,9 +604,9 @@ class FlashbackNativeShell(
             )
         }
         if (!navChromeEnabled) return bar
-        if (wideLayout) {
-            val open = sidebarOpen
-            bar.addView(
+        val menuChip =
+            if (wideLayout) {
+                val open = sidebarOpen
                 TextView(context).apply {
                     text = if (open) "⟨ Menu" else "☰ Menu"
                     setTextColor(gold)
@@ -631,10 +618,8 @@ class FlashbackNativeShell(
                         FlashbackFocus.Style.CHIP,
                         if (open) "Hide menu" else "Show menu",
                     )
-                },
-            )
-        } else {
-            bar.addView(
+                }
+            } else {
                 TextView(context).apply {
                     text = "☰"
                     setTextColor(gold)
@@ -642,9 +627,59 @@ class FlashbackNativeShell(
                     setPadding(dp(12), dp(10), dp(16), dp(10))
                     setOnClickListener { openDrawer() }
                     FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, "Open menu")
-                },
-            )
-        }
+                }
+            }
+        bar.addView(menuChip)
+        // Brand optically centered: balance menu width with a matching end spacer.
+        bar.addView(
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                setPadding(dp(8), 0, dp(8), 0)
+                addView(
+                    TextView(context).apply {
+                        text = "Flashback Repository"
+                        setTextColor(gold)
+                        textSize = 17f
+                        typeface = Typeface.SERIF
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
+                    },
+                )
+                addView(
+                    TextView(context).apply {
+                        text = "Own the original. Then improve it."
+                        setTextColor(creamMuted)
+                        textSize = 12f
+                        maxLines = 2
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        setPadding(0, dp(2), 0, 0)
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
+                    },
+                )
+            },
+        )
+        bar.addView(
+            View(context).apply {
+                // Measured after layout so spacer matches the menu chip width.
+                layoutParams = LinearLayout.LayoutParams(dp(48), 1)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                menuChip.post {
+                    layoutParams = LinearLayout.LayoutParams(menuChip.width.coerceAtLeast(dp(48)), 1)
+                    requestLayout()
+                }
+            },
+        )
         return bar
     }
 
@@ -902,13 +937,90 @@ class FlashbackNativeShell(
                     },
                 )
             }
+            col.addView(sectionTitle("Watch / save"))
+            col.addView(
+                body(
+                    "In-app Play uses on-device IPFS when a CID is known. " +
+                        "Save offline file pulls bytes through the local Kubo gateway (LAN Bitswap), " +
+                        "then you can reopen in-app, in a browser, or in VLC.",
+                ),
+            )
+            col.addView(
+                secondaryButton("Open in browser") {
+                    if (!ExternalMediaIntents.openInBrowser(context, preferred.url)) {
+                        Toast.makeText(context, "No browser found", Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
             col.addView(
                 secondaryButton("Open in external player") {
-                    if (!ExternalMediaIntents.open(context, preferred.url)) {
+                    val playUrl =
+                        if (keepCid.isNotEmpty() && IpfsSession.isReady()) {
+                            IpfsSession.gatewayUrl(keepCid)
+                        } else {
+                            preferred.url
+                        }
+                    if (!ExternalMediaIntents.open(context, playUrl)) {
                         Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
                     }
                 },
             )
+            if (keepCid.isNotEmpty()) {
+                col.addView(
+                    secondaryButton("Save offline file") {
+                        Toast.makeText(
+                            context,
+                            "Starting IPFS… saving via local gateway",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        Thread {
+                            val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
+                            val src =
+                                if (ready) {
+                                    IpfsSession.ensureFetching(keepCid)
+                                    IpfsSession.gatewayUrl(keepCid)
+                                } else {
+                                    preferred.url
+                                }
+                            val dest = MovieDownloadService.fileFor(context, src)
+                            main.post {
+                                if (java.io.File(dest.path + ".done").isFile) {
+                                    Toast.makeText(
+                                        context,
+                                        "Already saved — play in-app or Open in external player",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                    return@post
+                                }
+                                val intent = android.content.Intent(context, MovieDownloadService::class.java)
+                                    .putExtra(MovieDownloadService.EXTRA_URL, src)
+                                try {
+                                    if (android.os.Build.VERSION.SDK_INT >= 26) {
+                                        context.startForegroundService(intent)
+                                    } else {
+                                        context.startService(intent)
+                                    }
+                                    Toast.makeText(
+                                        context,
+                                        if (ready) {
+                                            "Saving offline from local IPFS gateway…"
+                                        } else {
+                                            "IPFS unavailable — saving via site HTTPS…"
+                                        },
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "Save failed: ${e.message ?: "unknown"}",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        }.start()
+                    },
+                )
+            }
             col.addView(
                 secondaryButton("Get VLC") {
                     if (!ExternalMediaIntents.openVlcPlayStore(context)) {
@@ -922,7 +1034,6 @@ class FlashbackNativeShell(
             col.addView(body("Feature media is not catalogued for streaming yet."))
         }
 
-        if (!wideLayout) col.addView(siteMenuRow())
         wrapScroll(col, seed)
     }
 
@@ -1010,7 +1121,8 @@ class FlashbackNativeShell(
             text = "← Back"
             setTextColor(gold)
             textSize = 14f
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            includeFontPadding = false
             setOnClickListener { leaveTheater() }
             FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, "Back to title")
             layoutParams = FrameLayout.LayoutParams(
@@ -1028,6 +1140,7 @@ class FlashbackNativeShell(
 
         val topEnd = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1042,7 +1155,8 @@ class FlashbackNativeShell(
                 text = label
                 setTextColor(cream)
                 textSize = 13f
-                setPadding(dp(12), dp(10), dp(12), dp(10))
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+                includeFontPadding = false
                 setOnClickListener { onClick() }
                 FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, desc)
                 layoutParams = LinearLayout.LayoutParams(
@@ -1064,6 +1178,15 @@ class FlashbackNativeShell(
         } else {
             null
         }
+        val browserChip = endChip("Browser", "Open stream in browser") {
+            val url = catalogStream().ifBlank {
+                FlashbackStreamLadder.resolveLocalPlayUrl(currentOption()!!) ?: ""
+            }
+            if (url.isBlank() || !ExternalMediaIntents.openInBrowser(context, url)) {
+                Toast.makeText(context, "No browser found", Toast.LENGTH_SHORT).show()
+            }
+        }
+        topEnd.addView(browserChip)
         val externalChip = endChip("External", "Open in external player") {
             val url =
                 FlashbackStreamLadder.resolveLocalPlayUrl(currentOption()!!)
@@ -1076,22 +1199,29 @@ class FlashbackNativeShell(
         chromeViews.add(topEnd)
         root.addView(topEnd)
 
-        // D-pad: Back ← → player ← → CC / External
+        // D-pad: Back ← → player ← → CC / Browser / External
         back.nextFocusRightId = player.id
         player.nextFocusLeftId = back.id
         player.nextFocusUpId = back.id
         if (ccChip != null) {
             ccChip.nextFocusLeftId = player.id
-            externalChip.nextFocusLeftId = ccChip.id
+            browserChip.nextFocusLeftId = ccChip.id
+            externalChip.nextFocusLeftId = browserChip.id
             player.nextFocusRightId = ccChip.id
         } else {
-            externalChip.nextFocusLeftId = player.id
-            player.nextFocusRightId = externalChip.id
+            browserChip.nextFocusLeftId = player.id
+            externalChip.nextFocusLeftId = browserChip.id
+            player.nextFocusRightId = browserChip.id
         }
 
+        // Save offline rides the same show/hide cycle as Back / CC / Browser / External.
+        var saveChromeEnabled = false
         player.onControllerVisibilityChanged = { visible ->
             val v = if (visible) View.VISIBLE else View.GONE
             for (chip in chromeViews) chip.visibility = v
+            if (saveChromeEnabled) {
+                player.setSaveChromeVisible(visible)
+            }
         }
 
         contentHost.addView(root)
@@ -1102,6 +1232,8 @@ class FlashbackNativeShell(
             val cid = opt.cid.trim()
             if (cid.isEmpty()) {
                 player.bindSrc(opt.url, autoPlay = true, subtitlesJson = p.subtitlesJson)
+                saveChromeEnabled = true
+                player.setSaveChromeVisible(chromeViews.any { it.visibility == View.VISIBLE })
                 player.requestPlayerFocus()
                 return@post
             }
@@ -1133,6 +1265,8 @@ class FlashbackNativeShell(
                         if (ipfsStatus.parent != null) ipfsStatus.visibility = View.GONE
                     }, 8_000)
                     player.bindSrc(local, autoPlay = true, subtitlesJson = p.subtitlesJson)
+                    saveChromeEnabled = true
+                    player.setSaveChromeVisible(chromeViews.any { it.visibility == View.VISIBLE })
                     player.requestPlayerFocus()
                     // Refresh peer count while watching.
                     main.postDelayed({ IpfsSession.refreshPeersAsync() }, 5_000)

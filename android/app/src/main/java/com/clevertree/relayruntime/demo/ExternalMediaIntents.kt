@@ -60,6 +60,33 @@ object ExternalMediaIntents {
         return open(context, VLC_PLAY_STORE, "*/*")
     }
 
+    /**
+     * Open an HTTPS URL in a browser (not a video player). Useful for Download /
+     * Open stream link when the user wants Chrome’s save dialog or in-tab handling.
+     */
+    fun openInBrowser(context: Context, href: String): Boolean {
+        val trimmed = href.trim()
+        if (trimmed.isEmpty()) return false
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return false
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(trimmed))
+            .addCategory(Intent.CATEGORY_BROWSABLE)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // Prefer Chrome when present so Download works predictably.
+        for (pkg in listOf(
+            "com.android.chrome",
+            "com.chrome.beta",
+            "com.sec.android.app.sbrowser",
+            "org.mozilla.firefox",
+        )) {
+            if (isPackageInstalled(context, pkg)) {
+                val browser = Intent(intent).setPackage(pkg)
+                if (startSafely(context, browser)) return true
+            }
+        }
+        if (startChooser(context, intent)) return true
+        return startSafely(context, intent)
+    }
+
     fun parseIntentHref(href: String, defaultMime: String = "video/*"): Intent? {
         val trimmed = href.trim()
         if (trimmed.startsWith("intent:", ignoreCase = true)) {

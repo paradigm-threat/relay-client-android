@@ -69,6 +69,12 @@ class RelayVideoPlayerView @JvmOverloads constructor(
     var onPlaybackFailed: ((String) -> Unit)? = null
 
     /**
+     * When set, decoder/format failures ask the host for another stream URL before showing
+     * the permanent error card. Return the next URL, or null to show the error overlay.
+     */
+    var onRequestFallbackStream: ((PlaybackErrors.Kind) -> String?)? = null
+
+    /**
      * Fired when the Media3 transport controller shows or hides.
      * Theater overlays (Back / External / CC) should mirror this so they don't sit forever on the picture.
      */
@@ -154,7 +160,7 @@ class RelayVideoPlayerView @JvmOverloads constructor(
                 Gravity.BOTTOM,
             )
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            // Hidden for Flashback native theater (bindSrc); hook path can show it.
+            // Starts hidden; native theater toggles with the Media3 controller.
             visibility = GONE
         }
         val saveBtn = Button(context).apply {
@@ -274,6 +280,15 @@ class RelayVideoPlayerView @JvmOverloads constructor(
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 Log.e(TAG, "playback error code=${error.errorCode}", error)
                 val msg = PlaybackErrors.classify(error.errorCode, error.message)
+                if (msg.kind == PlaybackErrors.Kind.DECODER || msg.kind == PlaybackErrors.Kind.FORMAT) {
+                    val next = onRequestFallbackStream?.invoke(msg.kind)
+                    if (!next.isNullOrBlank() && next != boundSrc) {
+                        Log.i(TAG, "falling back to lower rung after ${msg.kind}")
+                        val keepSubs = propsRef?.let { propString(it, "subtitlesJson") }
+                        bindSrc(next, autoPlay = true, subtitlesJson = keepSubs)
+                        return
+                    }
+                }
                 showPlaybackError(msg)
                 invokeHandlerProp("onError", true)
                 onPlaybackFailed?.invoke(msg.bannerLine())
