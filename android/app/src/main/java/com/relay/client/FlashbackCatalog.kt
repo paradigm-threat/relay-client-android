@@ -25,11 +25,16 @@ data class FlashbackProject(
     val timeCut: String = "",
     val availableIn: String = "",
     val filmRuntime: String = "",
+    /** Master pixel size from index.json (0 when unknown). */
+    val width: Int = 0,
+    val height: Int = 0,
     /**
      * IPFS CID from `assets.manifest.json` when the logical tip path is a thin pointer.
      * Prefer `/ipfs/{cid}` for progressive Range (gateway path→CID can 404 while CID works).
      */
     val ipfsCid: String = "",
+    val ipfsCidWeb: String = "",
+    val ipfsCidMobile: String = "",
 ) {
     /** Compact stats line for title / Now Showing meta. */
     fun statsLine(): String {
@@ -54,6 +59,12 @@ data class FlashbackProject(
         if (media.isBlank()) return null
         return FlashbackCatalog.joinOriginPath(origin, path, media)
     }
+
+    fun webStreamUrl(origin: String): String? =
+        FlashbackCatalog.mediaStreamUrl(origin, path, mediaWeb, ipfsCidWeb)
+
+    fun mobileStreamUrl(origin: String): String? =
+        FlashbackCatalog.mediaStreamUrl(origin, path, mediaMobile, ipfsCidMobile)
 
     fun posterUrl(origin: String): String? {
         if (image.isBlank()) return null
@@ -83,11 +94,30 @@ object FlashbackCatalog {
         val cidByPath = parseAssetsManifestCids(manifestText)
         if (cidByPath.isEmpty()) return library
         val merged = library.projects.map { p ->
-            val key = "${p.path.trim().trimEnd('/')}/${p.media.trim().trimStart('/')}"
-            val cid = cidByPath[key] ?: cidByPath[key.trimStart('/')]
-            if (cid.isNullOrBlank()) p else p.copy(ipfsCid = cid)
+            fun cidFor(file: String): String {
+                if (file.isBlank()) return ""
+                val key = "${p.path.trim().trimEnd('/')}/${file.trim().trimStart('/')}"
+                return cidByPath[key] ?: cidByPath[key.trimStart('/')] ?: ""
+            }
+            val masterCid = cidFor(p.media).ifBlank { p.ipfsCid }
+            val webCid = cidFor(p.mediaWeb).ifBlank { p.ipfsCidWeb }
+            val mobileCid = cidFor(p.mediaMobile).ifBlank { p.ipfsCidMobile }
+            if (masterCid == p.ipfsCid && webCid == p.ipfsCidWeb && mobileCid == p.ipfsCidMobile) {
+                p
+            } else {
+                p.copy(ipfsCid = masterCid, ipfsCidWeb = webCid, ipfsCidMobile = mobileCid)
+            }
         }
         return library.copy(projects = merged)
+    }
+
+    /** Tip path or `/ipfs/{cid}` for a catalog media filename. */
+    fun mediaStreamUrl(origin: String, path: String, file: String, cid: String): String? {
+        val base = origin.trim().trimEnd('/')
+        val c = cid.trim()
+        if (c.isNotEmpty()) return "$base/ipfs/$c"
+        if (file.isBlank()) return null
+        return joinOriginPath(origin, path, file)
     }
 
     /** Parse library JSON (unit-testable without network). */
@@ -115,7 +145,11 @@ object FlashbackCatalog {
                     timeCut = o.optString("timeCut"),
                     availableIn = o.optString("availableIn"),
                     filmRuntime = o.optString("filmRuntime"),
+                    width = o.optInt("width", 0),
+                    height = o.optInt("height", 0),
                     ipfsCid = o.optString("ipfsCid"),
+                    ipfsCidWeb = o.optString("ipfsCidWeb"),
+                    ipfsCidMobile = o.optString("ipfsCidMobile"),
                 ),
             )
         }

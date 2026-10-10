@@ -181,6 +181,11 @@ class FlashbackNativeShell(
 
         refreshBugFooterVisibility()
         showLoading("Loading library…")
+        // Warm Kubo when the user already has Keep-offline pins (or always start in background
+        // after catalog load so first Play is faster).
+        if (IpfsOfflineStore(context).all().isNotEmpty()) {
+            IpfsSession.startService(context)
+        }
         Thread {
             try {
                 val library = FlashbackCatalog.fetch(origin)
@@ -188,6 +193,7 @@ class FlashbackNativeShell(
                     applyLibrary(library)
                     showLibrary()
                     maybeCheckForUpdates(silent = true)
+                    IpfsSession.startService(context)
                 }
             } catch (e: Exception) {
                 main.post {
@@ -236,6 +242,13 @@ class FlashbackNativeShell(
 
     /** Same path as theater Back chip and system Back from theater. */
     private fun leaveTheater() {
+        // Reclaim unpinned ephemeral blocks if the on-device repo is over budget.
+        Thread {
+            try {
+                IpfsSession.maybeGcIfOverBudget(context)
+            } catch (_: Exception) {
+            }
+        }.start()
         val p = selected
         if (p != null) showTitle(p) else showLibrary()
     }
@@ -521,6 +534,7 @@ class FlashbackNativeShell(
     /** Compact in-page shortcuts (full list is in the navigation drawer). */
     private fun siteMenuRow(): LinearLayout =
         linkRow(
+            "App" to { showMarkdownDoc("Flashback App", "content/app.md") },
             "Setup" to { showMarkdownDoc("Setup for playback", "content/setup.md") },
             "Legal" to { showMarkdownDoc("Ownership policy", "content/legal.md") },
             "Why" to { showMarkdownDoc("Why we’re doing this", "content/motivation.md") },
@@ -541,8 +555,10 @@ class FlashbackNativeShell(
                 setImageResource(com.relay.client.R.drawable.fb_logo_header)
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_START
+                // 40% of former full-rail width (sidebar/drawer minus horizontal padding).
+                val railInnerDp = (if (wideLayout) 280 else 300) - 32
                 layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp((railInnerDp * 0.4f).toInt()),
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                 ).apply { bottomMargin = dp(8) }
                 contentDescription = "Flashback Repository"
@@ -727,7 +743,14 @@ class FlashbackNativeShell(
         refreshBugFooterVisibility()
 
         val movieAck = FlashbackOwnership.hasAck(context, FlashbackOwnership.movieKey(p.slug))
-        val stream = p.masterStreamUrl(origin)
+        val ladder = FlashbackStreamLadder.options(p, origin)
+        val hevc = HevcCapability.probe()
+        val preferredIdx = FlashbackStreamLadder.preferredIndex(
+            ladder,
+            maxHevcHeight = hevc.maxHeight,
+            masterHeight = p.height,
+        )
+        val preferred = ladder.getOrNull(preferredIdx)
 
         val col = column()
         val backLib = TextView(context).apply {
@@ -782,16 +805,106 @@ class FlashbackNativeShell(
                     "Terms" to { showMarkdownDoc("Terms", "content/terms.md") },
                 ),
             )
-        } else if (!stream.isNullOrBlank()) {
+        } else if (preferred != null) {
             col.addView(sectionTitle("Watch"))
-            val play = primaryButton("Play") {
-                showTheater(p, stream)
+            if (!hevc.canDecodeHeight(p.height) &&
+                ladder.any { it.kind != FlashbackStreamLadder.Kind.MASTER }
+            ) {
+                col.addView(
+                    body(
+                        "This device’s HEVC decode tops out below the 4K master — " +
+                            "Play uses ${preferred.label}. You can still try Full quality below.",
+                    ),
+                )
+            }
+            val play = primaryButton("Play · ${preferred.label}") {
+                showTheater(p, ladder, preferredIdx)
             }
             col.addView(play)
             seed = play
+            if (ladder.size > 1) {
+                col.addView(sectionTitle("Quality"))
+                col.addView(
+                    body("Default is picked for this TV/phone. Other rungs stay available to try."),
+                )
+                for ((idx, opt) in ladder.withIndex()) {
+                    val mark = if (idx == preferredIdx) "★ " else ""
+                    col.addView(
+                        secondaryButton("$mark${opt.label}") {
+                            showTheater(p, ladder, idx)
+                        },
+                    )
+                }
+            }
+            val keepCid = preferred.cid.ifBlank { p.ipfsCid }.trim()
+            if (keepCid.isNotEmpty()) {
+                col.addView(sectionTitle("Offline (IPFS)"))
+                col.addView(
+                    body(
+                        "Keep pins this title in the on-device Kubo node (Bitswap). " +
+                            "Play streams from the local gateway while blocks download — not via the Relay HTTP gateway.",
+                    ),
+                )
+                val store = IpfsOfflineStore(context)
+                col.addView(
+                    CheckBox(context).apply {
+                        text = "Keep offline copy"
+                        isChecked = store.isKept(keepCid)
+                        setTextColor(cream)
+                        textSize = 15f
+                        FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, text.toString())
+                        setOnCheckedChangeListener { _, checked ->
+                            isEnabled = false
+                            Thread {
+                                val ok =
+                                    try {
+                                        if (!IpfsSession.ensureStartedAndReady(context, 120_000L)) {
+                                            false
+                                        } else if (checked) {
+                                            IpfsSession.ensureFetching(keepCid)
+                                            val pinned = IpfsSession.pinAdd(keepCid)
+                                            if (pinned) {
+                                                store.keep(keepCid, p.title, p.slug)
+                                            }
+                                            pinned
+                                        } else {
+                                            IpfsSession.pinRm(keepCid)
+                                            store.remove(keepCid)
+                                            IpfsSession.repoGc()
+                                            true
+                                        }
+                                    } catch (_: Exception) {
+                                        false
+                                    }
+                                main.post {
+                                    isEnabled = true
+                                    if (!ok) {
+                                        isChecked = store.isKept(keepCid)
+                                        Toast.makeText(
+                                            context,
+                                            IpfsSession.lastError().ifBlank { "IPFS keep failed" },
+                                            Toast.LENGTH_LONG,
+                                        ).show()
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            if (checked) "Kept offline (pinned)" else "Offline copy removed",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
+                                }
+                            }.start()
+                        }
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ).apply { topMargin = dp(4); bottomMargin = dp(8) }
+                    },
+                )
+            }
             col.addView(
                 secondaryButton("Open in external player") {
-                    if (!ExternalMediaIntents.open(context, stream)) {
+                    if (!ExternalMediaIntents.open(context, preferred.url)) {
                         Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
                     }
                 },
@@ -818,7 +931,11 @@ class FlashbackNativeShell(
      * Edge chrome (Back / External / CC) shows and hides with the Media3 controller.
      * Playback errors use [PlaybackErrors] card inside [RelayVideoPlayerView] (not Toast).
      */
-    private fun showTheater(p: FlashbackProject, stream: String) {
+    private fun showTheater(
+        p: FlashbackProject,
+        ladder: List<FlashbackStreamLadder.Option> = FlashbackStreamLadder.options(p, origin),
+        startIndex: Int = 0,
+    ) {
         clear()
         inTheater = true
         selected = p
@@ -830,12 +947,31 @@ class FlashbackNativeShell(
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         enterImmersive()
 
+        var ladderIndex = startIndex.coerceIn(0, (ladder.size - 1).coerceAtLeast(0))
+        fun currentOption(): FlashbackStreamLadder.Option? = ladder.getOrNull(ladderIndex)
+        fun catalogStream(): String = currentOption()?.url.orEmpty()
+        if (catalogStream().isEmpty()) return
+
         val root = FrameLayout(context).apply {
             layoutParams = FrameLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT,
             )
             setBackgroundColor(Color.BLACK)
+        }
+
+        val ipfsStatus = TextView(context).apply {
+            text = "IPFS…"
+            setTextColor(creamMuted)
+            textSize = 12f
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setBackgroundColor(Color.parseColor("#CC1a0a0c"))
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM,
+            )
+            visibility = View.GONE
         }
 
         val player = RelayVideoPlayerView(context).apply {
@@ -845,9 +981,26 @@ class FlashbackNativeShell(
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
             onPlaybackFailed = { line -> lastPlaybackError = line }
+            onRequestFallbackStream = { _ ->
+                val next = FlashbackStreamLadder.nextIndex(ladder, ladderIndex)
+                if (next < 0) {
+                    null
+                } else {
+                    ladderIndex = next
+                    Toast.makeText(
+                        context,
+                        "Switching to ${ladder[next].label}…",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    // Fallback also goes through local IPFS when CID present.
+                    FlashbackStreamLadder.resolveLocalPlayUrl(ladder[next])
+                        ?: ladder[next].url.takeIf { ladder[next].cid.isBlank() }
+                }
+            }
         }
         playerView = player
         root.addView(player)
+        root.addView(ipfsStatus)
 
         // Edge chrome only (wrap_content) so empty screen areas still reach PlayerView taps.
         // Visibility mirrors the Media3 controller — not permanently over the picture.
@@ -912,7 +1065,10 @@ class FlashbackNativeShell(
             null
         }
         val externalChip = endChip("External", "Open in external player") {
-            if (!ExternalMediaIntents.open(context, stream)) {
+            val url =
+                FlashbackStreamLadder.resolveLocalPlayUrl(currentOption()!!)
+                    ?: catalogStream()
+            if (!ExternalMediaIntents.open(context, url)) {
                 Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
             }
         }
@@ -939,12 +1095,49 @@ class FlashbackNativeShell(
         }
 
         contentHost.addView(root)
-        // Bind after the view is attached so PlayerView has a surface; autoplay via playWhenReady.
+        // Bind after Kubo is ready (when CID present) so Ranges hit the local gateway.
         player.post {
-            if (!player.released) {
-                player.bindSrc(stream, autoPlay = true, subtitlesJson = p.subtitlesJson)
+            if (player.released) return@post
+            val opt = currentOption() ?: return@post
+            val cid = opt.cid.trim()
+            if (cid.isEmpty()) {
+                player.bindSrc(opt.url, autoPlay = true, subtitlesJson = p.subtitlesJson)
                 player.requestPlayerFocus()
+                return@post
             }
+            ipfsStatus.visibility = View.VISIBLE
+            ipfsStatus.text = "Starting IPFS (${IpfsSession.abiLabel()})…"
+            Thread {
+                val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
+                if (!ready) {
+                    main.post {
+                        ipfsStatus.text =
+                            "IPFS unavailable: ${IpfsSession.lastError().ifBlank { "node failed" }}"
+                        lastPlaybackError = ipfsStatus.text.toString()
+                        player.showSimulatedError(PlaybackErrors.Kind.NETWORK)
+                    }
+                    return@Thread
+                }
+                IpfsSession.ensureFetching(cid)
+                val local = FlashbackStreamLadder.resolveLocalPlayUrl(opt)
+                main.post {
+                    if (player.released) return@post
+                    if (local.isNullOrBlank()) {
+                        ipfsStatus.text = "IPFS ready but play URL missing"
+                        player.showSimulatedError(PlaybackErrors.Kind.NETWORK)
+                        return@post
+                    }
+                    ipfsStatus.text =
+                        "IPFS ${IpfsSession.abiMode()} · peers ${IpfsSession.peerCount()} · streaming via localhost"
+                    ipfsStatus.postDelayed({
+                        if (ipfsStatus.parent != null) ipfsStatus.visibility = View.GONE
+                    }, 8_000)
+                    player.bindSrc(local, autoPlay = true, subtitlesJson = p.subtitlesJson)
+                    player.requestPlayerFocus()
+                    // Refresh peer count while watching.
+                    main.postDelayed({ IpfsSession.refreshPeersAsync() }, 5_000)
+                }
+            }.start()
         }
     }
 
@@ -975,7 +1168,12 @@ class FlashbackNativeShell(
                     report.summaryLine(),
             ),
         )
-        col.addView(body("API ${report.apiLevel}. In-app play needs HEVC hardware; otherwise use external player."))
+        col.addView(
+            body(
+                "API ${report.apiLevel}. In-app Play prefers 4K HEVC when this device can decode it; " +
+                    "otherwise it auto-picks 1080p/720p H.264 when catalogued.",
+            ),
+        )
         updateBanner()?.let { col.addView(it) }
         col.addView(
             secondaryButton("Check for updates") {
@@ -1023,6 +1221,68 @@ class FlashbackNativeShell(
             col.addView(body(report.decoderNames.joinToString("\n")))
         }
 
+        col.addView(sectionTitle("IPFS (embedded Kubo)"))
+        val ipfsInfo = body(
+            "Mode: ${IpfsSession.abiLabel()}\n" +
+                "Ready: ${IpfsSession.isReady()}  peers: ${IpfsSession.peerCount()}\n" +
+                "Node: ${IpfsSession.nodeId().ifBlank { "—" }}\n" +
+                "Error: ${IpfsSession.lastError().ifBlank { "—" }}\n" +
+                "Kept: ${IpfsOfflineStore(context).all().size} title(s)",
+        )
+        col.addView(ipfsInfo)
+        col.addView(
+            primaryButton("Start / refresh IPFS node") {
+                ipfsInfo.text = "Starting Kubo…"
+                Thread {
+                    val ok = IpfsSession.ensureStartedAndReady(context, 120_000L)
+                    IpfsSession.refreshPeersAsync()
+                    Thread.sleep(800)
+                    main.post {
+                        ipfsInfo.text =
+                            if (ok) {
+                                "Mode: ${IpfsSession.abiLabel()}\n" +
+                                    "Ready: true  peers: ${IpfsSession.peerCount()}\n" +
+                                    "Node: ${IpfsSession.nodeId()}\n" +
+                                    "Gateway: ${IpfsSession.gatewayBaseUrl()}"
+                            } else {
+                                "IPFS failed: ${IpfsSession.lastError()}"
+                            }
+                    }
+                }.start()
+            },
+        )
+        col.addView(
+            secondaryButton("Gateway Range probe (sample CID)") {
+                val sampleCid =
+                    sampleStreamProject()?.ipfsCid?.trim().orEmpty().ifBlank {
+                        // Tiny well-known empty dir CID as last resort for node liveness.
+                        "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+                    }
+                ipfsInfo.text = "Probing gateway Range for ${sampleCid.take(20)}…"
+                Thread {
+                    val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
+                    if (ready) IpfsSession.ensureFetching(sampleCid)
+                    val ok = ready && IpfsSession.gatewayRangeOk(sampleCid)
+                    main.post {
+                        ipfsInfo.text =
+                            "Range probe ${if (ok) "OK" else "FAIL"} · ready=$ready · " +
+                                "peers=${IpfsSession.peerCount()} · ${IpfsSession.lastError().ifBlank { "no error" }}"
+                    }
+                }.start()
+            },
+        )
+        col.addView(
+            secondaryButton("Stop IPFS node") {
+                IpfsNodeService.stop(context)
+                ipfsInfo.text = "IPFS stop requested"
+            },
+        )
+        val kept = IpfsOfflineStore(context).all()
+        if (kept.isNotEmpty()) {
+            col.addView(sectionTitle("Kept offline"))
+            col.addView(body(kept.joinToString("\n") { "• ${it.title.ifBlank { it.cid.take(16) }}" }))
+        }
+
         val sample = sampleStreamProject()
         val sampleUrl = sample?.masterStreamUrl(origin)
 
@@ -1052,12 +1312,30 @@ class FlashbackNativeShell(
         )
         if (sample != null && !sampleUrl.isNullOrBlank()) {
             col.addView(
-                primaryButton("Try sample stream (${sample.title})") {
-                    player.bindSrc(sampleUrl, autoPlay = true)
+                primaryButton("Try sample via IPFS localhost (${sample.title})") {
+                    val cid = sample.ipfsCid.trim()
+                    if (cid.isEmpty()) {
+                        Toast.makeText(context, "Sample has no CID", Toast.LENGTH_SHORT).show()
+                        return@primaryButton // leave onClick early
+                    }
+                    ipfsInfo.text = "Fetching $cid via Bitswap…"
+                    Thread {
+                        val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
+                        if (!ready) {
+                            main.post { ipfsInfo.text = "IPFS failed: ${IpfsSession.lastError()}" }
+                            return@Thread
+                        }
+                        IpfsSession.ensureFetching(cid)
+                        val local = IpfsSession.gatewayUrl(cid)
+                        main.post {
+                            ipfsInfo.text = "Playing $local"
+                            player.bindSrc(local, autoPlay = true)
+                        }
+                    }.start()
                 },
             )
             col.addView(
-                secondaryButton("Open sample externally") {
+                secondaryButton("Open sample externally (catalog URL)") {
                     if (!ExternalMediaIntents.open(context, sampleUrl)) {
                         Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
                     }

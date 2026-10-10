@@ -2,7 +2,7 @@
 
 Fast checks for Flashback Repository installs (`com.flashback.repository`). Use this page on a computer while the phone runs the app, or open **Lab** in the app library.
 
-Download: **[flashback.apk](/downloads/flashback.apk)** — sideload steps on [Setup](/setup).
+Download / sideload: **[Flashback App](/app)** (versioned APKs + troubleshooting).
 
 ## What “pass” looks like
 

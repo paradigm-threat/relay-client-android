@@ -37,8 +37,8 @@ android {
         // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
         // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 23
-        versionName "1.0.23"
+        versionCode 26
+        versionName "1.0.26"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -99,16 +99,26 @@ android {
         abi {
             enable true
             reset()
-            include "armeabi-v7a", "arm64-v8a"
+            // Sideload / Fire TV only. Emulator: -PipfsIncludeX86=true (adds x86_64 split).
+            def abis = ["armeabi-v7a", "arm64-v8a"]
+            if (project.hasProperty("ipfsIncludeX86")) {
+                abis.add("x86_64")
+            }
+            include(*abis.toArray(new String[0]))
             universalApk true
         }
     }
 
     packagingOptions {
         pickFirst "**/libc++_shared.so"
-        // Emulator ABIs stay in jniLibs for local debug; omit from sideload APKs.
         exclude "lib/x86/**"
-        exclude "lib/x86_64/**"
+        if (!project.hasProperty("ipfsIncludeX86")) {
+            exclude "lib/x86_64/**"
+        }
+        // Required so libkubo_daemon.so is a real on-disk executable we can ProcessBuilder.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     compileOptions {
@@ -119,6 +129,43 @@ android {
     kotlinOptions {
         jvmTarget = '11'
     }
+}
+
+// Copy embedded Kubo daemon into jniLibs (gitignored). Build with android/ipfs-kubo/build-kubo-android.sh
+tasks.register("syncIpfsKubo", Copy) {
+    def prebuilt = file("${rootProject.projectDir}/ipfs-kubo/prebuilt")
+    def wantX86 = project.hasProperty("ipfsIncludeX86")
+    from("$prebuilt/arm64-v8a") { include "libkubo_daemon.so"; into "arm64-v8a" }
+    from("$prebuilt/armeabi-v7a") { include "libkubo_daemon.so"; into "armeabi-v7a" }
+    def x64 = new File(prebuilt, "x86_64/libkubo_daemon.so")
+    if (wantX86 && x64.isFile()) {
+        from("$prebuilt/x86_64") { include "libkubo_daemon.so"; into "x86_64" }
+    }
+    into "src/main/jniLibs"
+    doFirst {
+        def a64 = new File(prebuilt, "arm64-v8a/libkubo_daemon.so")
+        def v7 = new File(prebuilt, "armeabi-v7a/libkubo_daemon.so")
+        if (!a64.isFile() || !v7.isFile()) {
+            throw new GradleException(
+                "Missing Kubo prebuilts under ${prebuilt}. Run android/ipfs-kubo/build-kubo-android.sh first.",
+            )
+        }
+        // Drop stale emulator lib from jniLibs on production builds.
+        if (!wantX86) {
+            def stale = file("src/main/jniLibs/x86_64/libkubo_daemon.so")
+            if (stale.isFile()) {
+                stale.delete()
+                logger.lifecycle("syncIpfsKubo: removed jniLibs/x86_64 (release/sideload)")
+            }
+        }
+        logger.lifecycle(
+            "syncIpfsKubo: arm64=${a64.length()} v7a=${v7.length()}" +
+                (wantX86 && x64.isFile() ? " x86_64=${x64.length()}" : " (no x86_64)"),
+        )
+    }
+}
+afterEvaluate {
+    tasks.named("preBuild").configure { dependsOn("syncIpfsKubo") }
 }
 
 // Sync site markdown into APK assets (offline drawer fallback):
@@ -179,6 +226,8 @@ tasks.register("writeFlashbackVersionManifest") {
 //     -PflashbackDownloadsDir=/path/to/fan-edits/downloads \
 //     -PflashbackManifestOut=/path/to/fan-edits/downloads/flashback.json
 tasks.register("publishFlashbackDownloads") {
+    // Run :app:syncFlashbackContent first when content changed (not a hard dependsOn —
+    // Copy→assets races lint/merge otherwise).
     dependsOn("assembleFlashbackRelease", "writeFlashbackVersionManifest")
     doLast {
         def outProp = project.findProperty("flashbackDownloadsDir")
