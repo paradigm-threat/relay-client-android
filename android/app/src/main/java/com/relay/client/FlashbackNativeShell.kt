@@ -687,6 +687,9 @@ class FlashbackNativeShell(
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(10), dp(8), dp(10))
+            // Whole row is one tap / D-pad target — children must not steal clicks
+            // (Markwon linkify installs a MovementMethod that eats blurb taps).
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setOnClickListener { showTitle(p) }
             FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, p.title)
             addView(
@@ -695,6 +698,8 @@ class FlashbackNativeShell(
                     setTextColor(gold)
                     textSize = 17f
                     typeface = Typeface.SERIF
+                    isClickable = false
+                    isFocusable = false
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 },
             )
@@ -704,6 +709,11 @@ class FlashbackNativeShell(
                         setMarkdown(p.blurb)
                         maxLines = 3
                         setPadding(0, dp(2), 0, 0)
+                        movementMethod = null
+                        linksClickable = false
+                        isClickable = false
+                        isFocusable = false
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     },
                 )
             }
@@ -715,6 +725,9 @@ class FlashbackNativeShell(
                         setTextColor(creamMuted)
                         textSize = 12f
                         setPadding(0, dp(4), 0, 0)
+                        isClickable = false
+                        isFocusable = false
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     },
                 )
             }
@@ -814,330 +827,372 @@ class FlashbackNativeShell(
             loadPoster(poster, posterUrl)
         }
 
+        // Confirm / Ways share one slot so OK does not rebuild the page (which reset ScrollView to top).
+        val watchSlot = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+        col.addView(watchSlot)
+
         var seed: View = backLib
+        fun revealWays(focusFirst: Boolean): View? {
+            watchSlot.removeAllViews()
+            val first =
+                fillWaysToWatch(
+                    host = watchSlot,
+                    p = p,
+                    ladder = ladder,
+                    preferredIdx = preferredIdx,
+                    preferred = preferred,
+                    hevc = hevc,
+                )
+            if (focusFirst && first != null) {
+                // Focus the new controls without recreating the ScrollView (keeps scrollY).
+                first.post { first.requestFocus() }
+            }
+            return first
+        }
+
         if (!movieAck) {
-            col.addView(sectionTitle("CONFIRM"))
-            col.addView(
+            watchSlot.addView(sectionTitle("CONFIRM"))
+            watchSlot.addView(
                 body(
                     "I confirm I own a legal copy of ${p.originalTitle.ifBlank { p.title }} before I play its edit.",
                 ),
             )
-            col.addView(
+            watchSlot.addView(
                 body(
                     "Same house rule fanedit communities have used for years: the edit is for people who already have the movie.",
                 ),
             )
             val affirm = primaryButton("OK — I confirm") {
                 FlashbackHits.acknowledgeTitle(context, origin, p.slug)
-                // Stay on the movie page — do not autoplay (web: gate unlocks chrome; Play is separate).
-                showTitle(p)
+                revealWays(focusFirst = true)
             }
-            col.addView(affirm)
+            watchSlot.addView(affirm)
             seed = affirm
-            col.addView(
+            watchSlot.addView(
                 linkRow(
                     "Ownership policy" to { showMarkdownDoc("Ownership policy", "content/legal.md") },
                     "Terms" to { showMarkdownDoc("Terms", "content/terms.md") },
                 ),
             )
         } else {
-            // Ways to watch — gate Stream / Download like the website (Now showing + IPFS catalog).
-            val catalogShowing =
-                p.isShowing || nowShowingSlugs.any { it.equals(p.slug, ignoreCase = true) }
-            val keepCid = (preferred?.cid ?: "").ifBlank { p.ipfsCid }.trim()
-            val inCatalog = keepCid.length >= 8
-            val streamUrl = preferred?.url.orEmpty()
-            val hasStreamUrl = streamUrl.isNotEmpty()
-
-            col.addView(sectionTitle("Ways to watch"))
-            col.addView(
-                body("Stream when this server has the file, download via IPFS when catalogued, or request Drive links."),
-            )
-
-            col.addView(sectionTitle("1. Stream it now"))
-            col.addView(
-                body("Works for Now showing titles, or when the site gateway already has the bytes."),
-            )
-            if (preferred != null &&
-                !hevc.canDecodeHeight(p.height) &&
-                ladder.any { it.kind != FlashbackStreamLadder.Kind.MASTER }
-            ) {
-                col.addView(
-                    body(
-                        "This device’s HEVC decode tops out below the 4K master — " +
-                            "Play uses ${preferred.label} when streaming is available.",
-                    ),
-                )
-            }
-
-            val streamControls = ArrayList<View>()
-            val streamStatus = body(
-                when {
-                    !hasStreamUrl -> "No stream URL for this title yet."
-                    catalogShowing -> "Ready on this server (Now showing)."
-                    else -> "Checking if this server has the file…"
-                },
-            )
-            var streamReady = catalogShowing && hasStreamUrl
-
-            fun applyStreamEnabled(on: Boolean) {
-                streamReady = on
-                for (v in streamControls) {
-                    setActionEnabled(v, on)
-                }
-            }
-
-            if (preferred != null) {
-                val play = primaryButton("Play · ${preferred.label}") {
-                    if (!streamReady) {
-                        Toast.makeText(
-                            context,
-                            "Not ready to stream on this server yet.",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                        return@primaryButton
-                    }
-                    showTheater(p, ladder, preferredIdx)
-                }
-                col.addView(play)
-                streamControls.add(play)
-                seed = play
-                if (ladder.size > 1) {
-                    col.addView(
-                        body("Default quality is picked for this TV/phone. Other rungs stay available to try."),
-                    )
-                    for ((idx, opt) in ladder.withIndex()) {
-                        val mark = if (idx == preferredIdx) "★ " else ""
-                        val q = secondaryButton("$mark${opt.label}") {
-                            if (!streamReady) {
-                                Toast.makeText(
-                                    context,
-                                    "Not ready to stream on this server yet.",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                                return@secondaryButton
-                            }
-                            showTheater(p, ladder, idx)
-                        }
-                        col.addView(q)
-                        streamControls.add(q)
-                    }
-                }
-                val openBrowser = secondaryButton("Open in browser") {
-                    if (!streamReady) return@secondaryButton
-                    if (!ExternalMediaIntents.openInBrowser(context, preferred.url)) {
-                        Toast.makeText(context, "No browser found", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                col.addView(openBrowser)
-                streamControls.add(openBrowser)
-                val openExternal = secondaryButton("Open in external player") {
-                    if (!streamReady) return@secondaryButton
-                    val playUrl =
-                        if (keepCid.isNotEmpty() && IpfsSession.isReady()) {
-                            IpfsSession.gatewayUrl(keepCid)
-                        } else {
-                            preferred.url
-                        }
-                    if (!ExternalMediaIntents.open(context, playUrl)) {
-                        Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
-                    }
-                }
-                col.addView(openExternal)
-                streamControls.add(openExternal)
-            } else if (p.hasStreamMedia) {
-                col.addView(body("Feature media is catalogued but the stream URL could not be built."))
-            } else {
-                col.addView(body("Feature media is not catalogued for streaming yet."))
-            }
-            col.addView(streamStatus)
-            applyStreamEnabled(streamReady)
-
-            if (hasStreamUrl && !catalogShowing) {
-                Thread {
-                    val probe = FlashbackAssetStatus.probeUrl(streamUrl)
-                    main.post {
-                        if (selected?.slug != p.slug || currentScreen != "title") return@post
-                        if (probe.ready) {
-                            streamStatus.text = "Ready on this server."
-                            applyStreamEnabled(true)
-                        } else {
-                            streamStatus.text =
-                                "Not on this server right now. Try Download (if listed) or Request Drive links."
-                            applyStreamEnabled(false)
-                        }
-                    }
-                }.start()
-            } else if (!hasStreamUrl) {
-                applyStreamEnabled(false)
-            }
-
-            col.addView(sectionTitle("2. Download the file"))
-            col.addView(
-                body("Needs an IPFS CID in the catalog. Save via on-device Kubo when possible."),
-            )
-            val dlStatus = body(
-                if (inCatalog) {
-                    "Ready to download via IPFS."
-                } else {
-                    "This title is not in the IPFS catalog yet."
-                },
-            )
-            val downloadControls = ArrayList<View>()
-
-            fun applyDownloadEnabled(on: Boolean) {
-                for (v in downloadControls) {
-                    setActionEnabled(v, on)
-                }
-            }
-
-            if (inCatalog) {
-                col.addView(
-                    body(
-                        "Keep pins this title in the on-device Kubo node (Bitswap). " +
-                            "Play can stream from the local gateway while blocks download.",
-                    ),
-                )
-                val store = IpfsOfflineStore(context)
-                val keepBox =
-                    CheckBox(context).apply {
-                        text = "Keep offline copy"
-                        isChecked = store.isKept(keepCid)
-                        setTextColor(cream)
-                        textSize = 15f
-                        FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, text.toString())
-                        setOnCheckedChangeListener { _, checked ->
-                            if (!isEnabled) return@setOnCheckedChangeListener
-                            isEnabled = false
-                            Thread {
-                                val ok =
-                                    try {
-                                        if (!IpfsSession.ensureStartedAndReady(context, 120_000L)) {
-                                            false
-                                        } else if (checked) {
-                                            IpfsSession.ensureFetching(keepCid)
-                                            val pinned = IpfsSession.pinAdd(keepCid)
-                                            if (pinned) {
-                                                store.keep(keepCid, p.title, p.slug)
-                                            }
-                                            pinned
-                                        } else {
-                                            IpfsSession.pinRm(keepCid)
-                                            store.remove(keepCid)
-                                            IpfsSession.repoGc()
-                                            true
-                                        }
-                                    } catch (_: Exception) {
-                                        false
-                                    }
-                                main.post {
-                                    isEnabled = true
-                                    if (!ok) {
-                                        isChecked = store.isKept(keepCid)
-                                        Toast.makeText(
-                                            context,
-                                            IpfsSession.lastError().ifBlank { "IPFS keep failed" },
-                                            Toast.LENGTH_LONG,
-                                        ).show()
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            if (checked) "Kept offline (pinned)" else "Offline copy removed",
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    }
-                                }
-                            }.start()
-                        }
-                        layoutParams = LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ).apply { topMargin = dp(4); bottomMargin = dp(8) }
-                    }
-                col.addView(keepBox)
-                downloadControls.add(keepBox)
-
-                val saveBtn = secondaryButton("Save offline file") {
-                    Toast.makeText(
-                        context,
-                        "Starting IPFS… saving via local gateway",
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    Thread {
-                        val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
-                        val src =
-                            if (ready) {
-                                IpfsSession.ensureFetching(keepCid)
-                                IpfsSession.gatewayUrl(keepCid)
-                            } else {
-                                streamUrl.ifBlank { "$origin/ipfs/$keepCid" }
-                            }
-                        val dest = MovieDownloadService.fileFor(context, src)
-                        main.post {
-                            if (java.io.File(dest.path + ".done").isFile) {
-                                Toast.makeText(
-                                    context,
-                                    "Already saved — play in-app or Open in external player",
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                                return@post
-                            }
-                            val intent = android.content.Intent(context, MovieDownloadService::class.java)
-                                .putExtra(MovieDownloadService.EXTRA_URL, src)
-                            try {
-                                if (android.os.Build.VERSION.SDK_INT >= 26) {
-                                    context.startForegroundService(intent)
-                                } else {
-                                    context.startService(intent)
-                                }
-                                Toast.makeText(
-                                    context,
-                                    if (ready) {
-                                        "Saving offline from local IPFS gateway…"
-                                    } else {
-                                        "IPFS unavailable — saving via site HTTPS…"
-                                    },
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            } catch (e: Exception) {
-                                Toast.makeText(
-                                    context,
-                                    "Save failed: ${e.message ?: "unknown"}",
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            }
-                        }
-                    }.start()
-                }
-                col.addView(saveBtn)
-                downloadControls.add(saveBtn)
-            }
-            col.addView(dlStatus)
-            applyDownloadEnabled(inCatalog)
-
-            col.addView(sectionTitle("3. Get links by email"))
-            col.addView(
-                body("Send the request email — the automatic reply includes the shared Drive library."),
-            )
-            val requestDrive = secondaryButton("Request Drive links") {
-                val url = origin.trim().trimEnd('/') + "/request"
-                if (!ExternalMediaIntents.openInBrowser(context, url)) {
-                    Toast.makeText(context, "No browser found", Toast.LENGTH_SHORT).show()
-                }
-            }
-            col.addView(requestDrive)
-            if (seed === backLib) seed = requestDrive
-
-            col.addView(
-                secondaryButton("Get VLC") {
-                    if (!ExternalMediaIntents.openVlcPlayStore(context)) {
-                        Toast.makeText(context, "Could not open Play Store", Toast.LENGTH_SHORT).show()
-                    }
-                },
-            )
+            seed = revealWays(focusFirst = false) ?: backLib
         }
 
         wrapScroll(col, seed)
+    }
+
+    /**
+     * Ways to watch panel into [host]. Returns the preferred focus seed (Play or Request).
+     */
+    private fun fillWaysToWatch(
+        host: LinearLayout,
+        p: FlashbackProject,
+        ladder: List<FlashbackStreamLadder.Option>,
+        preferredIdx: Int,
+        preferred: FlashbackStreamLadder.Option?,
+        hevc: HevcCapability.Report,
+    ): View? {
+        val catalogShowing =
+            p.isShowing || nowShowingSlugs.any { it.equals(p.slug, ignoreCase = true) }
+        val keepCid = (preferred?.cid ?: "").ifBlank { p.ipfsCid }.trim()
+        val inCatalog = keepCid.length >= 8
+        val streamUrl = preferred?.url.orEmpty()
+        val hasStreamUrl = streamUrl.isNotEmpty()
+        var seed: View? = null
+
+        host.addView(sectionTitle("Ways to watch"))
+        host.addView(
+            body("Stream when this server has the file, download via IPFS when catalogued, or request Drive links."),
+        )
+
+        host.addView(sectionTitle("1. Stream it now"))
+        host.addView(
+            body("Works for Now showing titles, or when the site gateway already has the bytes."),
+        )
+        if (preferred != null &&
+            !hevc.canDecodeHeight(p.height) &&
+            ladder.any { it.kind != FlashbackStreamLadder.Kind.MASTER }
+        ) {
+            host.addView(
+                body(
+                    "This device’s HEVC decode tops out below the 4K master — " +
+                        "Play uses ${preferred.label} when streaming is available.",
+                ),
+            )
+        }
+
+        val streamControls = ArrayList<View>()
+        val streamStatus = body(
+            when {
+                !hasStreamUrl -> "No stream URL for this title yet."
+                catalogShowing -> "Ready on this server (Now showing)."
+                else -> "Checking if this server has the file…"
+            },
+        )
+        var streamReady = catalogShowing && hasStreamUrl
+
+        fun applyStreamEnabled(on: Boolean) {
+            streamReady = on
+            for (v in streamControls) {
+                setActionEnabled(v, on)
+            }
+        }
+
+        if (preferred != null) {
+            val play = primaryButton("Play · ${preferred.label}") {
+                if (!streamReady) {
+                    Toast.makeText(
+                        context,
+                        "Not ready to stream on this server yet.",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return@primaryButton
+                }
+                showTheater(p, ladder, preferredIdx)
+            }
+            host.addView(play)
+            streamControls.add(play)
+            seed = play
+            if (ladder.size > 1) {
+                host.addView(
+                    body("Default quality is picked for this TV/phone. Other rungs stay available to try."),
+                )
+                for ((idx, opt) in ladder.withIndex()) {
+                    val mark = if (idx == preferredIdx) "★ " else ""
+                    val q = secondaryButton("$mark${opt.label}") {
+                        if (!streamReady) {
+                            Toast.makeText(
+                                context,
+                                "Not ready to stream on this server yet.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            return@secondaryButton
+                        }
+                        showTheater(p, ladder, idx)
+                    }
+                    host.addView(q)
+                    streamControls.add(q)
+                }
+            }
+            val openBrowser = secondaryButton("Open in browser") {
+                if (!streamReady) return@secondaryButton
+                if (!ExternalMediaIntents.openInBrowser(context, preferred.url)) {
+                    Toast.makeText(context, "No browser found", Toast.LENGTH_SHORT).show()
+                }
+            }
+            host.addView(openBrowser)
+            streamControls.add(openBrowser)
+            val openExternal = secondaryButton("Open in external player") {
+                if (!streamReady) return@secondaryButton
+                val playUrl =
+                    if (keepCid.isNotEmpty() && IpfsSession.isReady()) {
+                        IpfsSession.gatewayUrl(keepCid)
+                    } else {
+                        preferred.url
+                    }
+                if (!ExternalMediaIntents.open(context, playUrl)) {
+                    Toast.makeText(context, PlaybackErrors.shortNoHandlerToast(), Toast.LENGTH_SHORT).show()
+                }
+            }
+            host.addView(openExternal)
+            streamControls.add(openExternal)
+        } else if (p.hasStreamMedia) {
+            host.addView(body("Feature media is catalogued but the stream URL could not be built."))
+        } else {
+            host.addView(body("Feature media is not catalogued for streaming yet."))
+        }
+        host.addView(streamStatus)
+        applyStreamEnabled(streamReady)
+
+        if (hasStreamUrl && !catalogShowing) {
+            Thread {
+                val probe = FlashbackAssetStatus.probeUrl(streamUrl)
+                main.post {
+                    if (selected?.slug != p.slug || currentScreen != "title") return@post
+                    if (probe.ready) {
+                        streamStatus.text = "Ready on this server."
+                        applyStreamEnabled(true)
+                    } else {
+                        streamStatus.text =
+                            "Not on this server right now. Try Download (if listed) or Request Drive links."
+                        applyStreamEnabled(false)
+                    }
+                }
+            }.start()
+        } else if (!hasStreamUrl) {
+            applyStreamEnabled(false)
+        }
+
+        host.addView(sectionTitle("2. Download the file"))
+        host.addView(
+            body("Needs an IPFS CID in the catalog. Save via on-device Kubo when possible."),
+        )
+        val dlStatus = body(
+            if (inCatalog) {
+                "Ready to download via IPFS."
+            } else {
+                "This title is not in the IPFS catalog yet."
+            },
+        )
+        val downloadControls = ArrayList<View>()
+
+        fun applyDownloadEnabled(on: Boolean) {
+            for (v in downloadControls) {
+                setActionEnabled(v, on)
+            }
+        }
+
+        if (inCatalog) {
+            host.addView(
+                body(
+                    "Keep pins this title in the on-device Kubo node (Bitswap). " +
+                        "Play can stream from the local gateway while blocks download.",
+                ),
+            )
+            val store = IpfsOfflineStore(context)
+            val keepBox =
+                CheckBox(context).apply {
+                    text = "Keep offline copy"
+                    isChecked = store.isKept(keepCid)
+                    setTextColor(cream)
+                    textSize = 15f
+                    FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, text.toString())
+                    setOnCheckedChangeListener { _, checked ->
+                        if (!isEnabled) return@setOnCheckedChangeListener
+                        isEnabled = false
+                        Thread {
+                            val ok =
+                                try {
+                                    if (!IpfsSession.ensureStartedAndReady(context, 120_000L)) {
+                                        false
+                                    } else if (checked) {
+                                        IpfsSession.ensureFetching(keepCid)
+                                        val pinned = IpfsSession.pinAdd(keepCid)
+                                        if (pinned) {
+                                            store.keep(keepCid, p.title, p.slug)
+                                        }
+                                        pinned
+                                    } else {
+                                        IpfsSession.pinRm(keepCid)
+                                        store.remove(keepCid)
+                                        IpfsSession.repoGc()
+                                        true
+                                    }
+                                } catch (_: Exception) {
+                                    false
+                                }
+                            main.post {
+                                isEnabled = true
+                                if (!ok) {
+                                    isChecked = store.isKept(keepCid)
+                                    Toast.makeText(
+                                        context,
+                                        IpfsSession.lastError().ifBlank { "IPFS keep failed" },
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        if (checked) "Kept offline (pinned)" else "Offline copy removed",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            }
+                        }.start()
+                    }
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = dp(4); bottomMargin = dp(8) }
+                }
+            host.addView(keepBox)
+            downloadControls.add(keepBox)
+
+            val saveBtn = secondaryButton("Save offline file") {
+                Toast.makeText(
+                    context,
+                    "Starting IPFS… saving via local gateway",
+                    Toast.LENGTH_SHORT,
+                ).show()
+                Thread {
+                    val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
+                    val src =
+                        if (ready) {
+                            IpfsSession.ensureFetching(keepCid)
+                            IpfsSession.gatewayUrl(keepCid)
+                        } else {
+                            streamUrl.ifBlank { "$origin/ipfs/$keepCid" }
+                        }
+                    val dest = MovieDownloadService.fileFor(context, src)
+                    main.post {
+                        if (java.io.File(dest.path + ".done").isFile) {
+                            Toast.makeText(
+                                context,
+                                "Already saved — play in-app or Open in external player",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                            return@post
+                        }
+                        val intent = android.content.Intent(context, MovieDownloadService::class.java)
+                            .putExtra(MovieDownloadService.EXTRA_URL, src)
+                        try {
+                            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                                context.startForegroundService(intent)
+                            } else {
+                                context.startService(intent)
+                            }
+                            Toast.makeText(
+                                context,
+                                if (ready) {
+                                    "Saving offline from local IPFS gateway…"
+                                } else {
+                                    "IPFS unavailable — saving via site HTTPS…"
+                                },
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                context,
+                                "Save failed: ${e.message ?: "unknown"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                }.start()
+            }
+            host.addView(saveBtn)
+            downloadControls.add(saveBtn)
+        }
+        host.addView(dlStatus)
+        applyDownloadEnabled(inCatalog)
+
+        host.addView(sectionTitle("3. Get links by email"))
+        host.addView(
+            body("Send the request email — the automatic reply includes the shared Drive library."),
+        )
+        val requestDrive = secondaryButton("Request Drive links") {
+            val url = origin.trim().trimEnd('/') + "/request"
+            if (!ExternalMediaIntents.openInBrowser(context, url)) {
+                Toast.makeText(context, "No browser found", Toast.LENGTH_SHORT).show()
+            }
+        }
+        host.addView(requestDrive)
+        if (seed == null) seed = requestDrive
+
+        host.addView(
+            secondaryButton("Get VLC") {
+                if (!ExternalMediaIntents.openVlcPlayStore(context)) {
+                    Toast.makeText(context, "Could not open Play Store", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+        return seed
     }
 
     /**
