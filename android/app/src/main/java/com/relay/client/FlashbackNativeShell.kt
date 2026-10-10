@@ -654,9 +654,9 @@ class FlashbackNativeShell(
                 )
                 addView(
                     TextView(context).apply {
-                        text = "Own the original. Then improve it."
+                        text = "Reasserting our 1st Amendment Rights one Movie at a time"
                         setTextColor(creamMuted)
-                        textSize = 12f
+                        textSize = 11f
                         maxLines = 2
                         ellipsize = android.text.TextUtils.TruncateAt.END
                         gravity = Gravity.CENTER_HORIZONTAL
