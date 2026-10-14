@@ -27,20 +27,31 @@ object FlashbackStreamLadder {
      */
     fun options(project: FlashbackProject, origin: String): List<Option> {
         val out = ArrayList<Option>(3)
-        project.masterStreamUrl(origin)?.let {
+        project.masterStreamUrl(origin)?.let { url ->
             val masterLabel =
                 if (project.height >= 2000) "Full quality (4K HEVC)"
                 else if (project.availableIn.isNotBlank()) project.availableIn
                 else "Full quality (MKV)"
-            out.add(Option(Kind.MASTER, masterLabel, it, project.ipfsCid.trim()))
+            // CDN absolute URLs play directly; tip/IPFS keep CID for localhost gateway.
+            val cid = if (isDirectHttps(url)) "" else project.ipfsCid.trim()
+            out.add(Option(Kind.MASTER, masterLabel, url, cid))
         }
-        project.webStreamUrl(origin)?.let {
-            out.add(Option(Kind.WEB, "1080p (H.264)", it, project.ipfsCidWeb.trim()))
+        project.webStreamUrl(origin)?.let { url ->
+            val cid = if (isDirectHttps(url)) "" else project.ipfsCidWeb.trim()
+            out.add(Option(Kind.WEB, "1080p (H.264)", url, cid))
         }
-        project.mobileStreamUrl(origin)?.let {
-            out.add(Option(Kind.MOBILE, "720p (H.264)", it, project.ipfsCidMobile.trim()))
+        project.mobileStreamUrl(origin)?.let { url ->
+            val cid = if (isDirectHttps(url)) "" else project.ipfsCidMobile.trim()
+            out.add(Option(Kind.MOBILE, "720p (H.264)", url, cid))
         }
         return out
+    }
+
+    private fun isDirectHttps(url: String): Boolean {
+        val u = url.trim()
+        if (!u.startsWith("http://") && !u.startsWith("https://")) return false
+        // Origin /ipfs/{cid} still goes through embedded Kubo when CID is known.
+        return !u.contains("/ipfs/")
     }
 
     /**

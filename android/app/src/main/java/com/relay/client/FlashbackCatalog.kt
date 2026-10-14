@@ -35,6 +35,10 @@ data class FlashbackProject(
     val ipfsCid: String = "",
     val ipfsCidWeb: String = "",
     val ipfsCidMobile: String = "",
+    /** Bunny (or other) progressive HTTPS for Now showing — preferred over tip/IPFS for stream UI. */
+    val streamHttps: String = "",
+    val streamHttpsWeb: String = "",
+    val streamHttpsMobile: String = "",
 ) {
     /** Compact stats line for title / Now Showing meta. */
     fun statsLine(): String {
@@ -47,9 +51,11 @@ data class FlashbackProject(
 
     /**
      * Progressive HTTPS master URL.
-     * Uses `/ipfs/{cid}` when [ipfsCid] is set (thin IPFS masters); otherwise tip path.
+     * Prefers [streamHttps] (Now showing CDN). Else `/ipfs/{cid}` when set; else tip path.
      */
     fun masterStreamUrl(origin: String): String? {
+        val bunny = streamHttps.trim()
+        if (bunny.startsWith("http://") || bunny.startsWith("https://")) return bunny
         if (media.isBlank() && ipfsCid.isBlank()) return null
         val base = origin.trim().trimEnd('/')
         val cid = ipfsCid.trim()
@@ -60,11 +66,17 @@ data class FlashbackProject(
         return FlashbackCatalog.joinOriginPath(origin, path, media)
     }
 
-    fun webStreamUrl(origin: String): String? =
-        FlashbackCatalog.mediaStreamUrl(origin, path, mediaWeb, ipfsCidWeb)
+    fun webStreamUrl(origin: String): String? {
+        val bunny = streamHttpsWeb.trim()
+        if (bunny.startsWith("http://") || bunny.startsWith("https://")) return bunny
+        return FlashbackCatalog.mediaStreamUrl(origin, path, mediaWeb, ipfsCidWeb)
+    }
 
-    fun mobileStreamUrl(origin: String): String? =
-        FlashbackCatalog.mediaStreamUrl(origin, path, mediaMobile, ipfsCidMobile)
+    fun mobileStreamUrl(origin: String): String? {
+        val bunny = streamHttpsMobile.trim()
+        if (bunny.startsWith("http://") || bunny.startsWith("https://")) return bunny
+        return FlashbackCatalog.mediaStreamUrl(origin, path, mediaMobile, ipfsCidMobile)
+    }
 
     fun posterUrl(origin: String): String? {
         if (image.isBlank()) return null
@@ -150,6 +162,9 @@ object FlashbackCatalog {
                     ipfsCid = o.optString("ipfsCid"),
                     ipfsCidWeb = o.optString("ipfsCidWeb"),
                     ipfsCidMobile = o.optString("ipfsCidMobile"),
+                    streamHttps = o.optString("streamHttps"),
+                    streamHttpsWeb = o.optString("streamHttpsWeb"),
+                    streamHttpsMobile = o.optString("streamHttpsMobile"),
                 ),
             )
         }
