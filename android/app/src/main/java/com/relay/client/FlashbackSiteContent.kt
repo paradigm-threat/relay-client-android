@@ -15,7 +15,9 @@ object FlashbackSiteContent {
         data class Markdown(val title: String, val path: String) : NavAction()
         object PlaybackLab : NavAction()
         object Board : NavAction()
+        object Chat : NavAction()
         object CheckUpdates : NavAction()
+        object CycleTheaterTheme : NavAction()
     }
 
     data class NavItem(
@@ -25,21 +27,31 @@ object FlashbackSiteContent {
     )
 
     /** Drawer order: header nav, then footer-only Terms, then Android extras. */
-    val drawerItems: List<NavItem> = listOf(
-        NavItem("library", "Library", NavAction.Library),
-        NavItem("setup", "Setup", NavAction.Markdown("Setup for playback", "content/setup.md")),
-        NavItem("request", "Request", NavAction.Markdown("Request downloads", "content/request.md")),
-        NavItem("motivation", "Why", NavAction.Markdown("Why we’re doing this", "content/motivation.md")),
-        NavItem("submit", "Submit", NavAction.Markdown("Submissions", "content/submit.md")),
-        NavItem("board", "Report a bug", NavAction.Board),
-        NavItem("legal", "Legal", NavAction.Markdown("Ownership policy", "content/legal.md")),
-        NavItem("terms", "Terms", NavAction.Markdown("Terms", "content/terms.md")),
-        NavItem("android-lab", "Android lab", NavAction.PlaybackLab),
-        NavItem("updates", "Check for updates", NavAction.CheckUpdates),
-    )
+    fun drawerItems(context: Context? = null): List<NavItem> {
+        val themeId =
+            if (context != null) FlashbackTheaterPrefs.theme(context)
+            else FlashbackTheaterPrefs.DEFAULT_THEME
+        val themeLabel = FlashbackTheaterPrefs.label(themeId)
+        return listOf(
+            NavItem("library", "Library", NavAction.Library),
+            NavItem("app", "App", NavAction.Markdown("Flashback App", "content/app.md")),
+            NavItem("setup", "Setup", NavAction.Markdown("Setup for playback", "content/setup.md")),
+            NavItem("request", "Request", NavAction.Markdown("Request downloads", "content/request.md")),
+            NavItem("motivation", "Why", NavAction.Markdown("Why we’re doing this", "content/motivation.md")),
+            NavItem("submit", "Submit", NavAction.Markdown("Submissions", "content/submit.md")),
+            NavItem("board", "Report a bug", NavAction.Board),
+            NavItem("chat", "Chat", NavAction.Chat),
+            NavItem("legal", "Legal", NavAction.Markdown("Ownership policy", "content/legal.md")),
+            NavItem("terms", "Terms", NavAction.Markdown("Terms", "content/terms.md")),
+            NavItem("theme", "Theme: $themeLabel", NavAction.CycleTheaterTheme),
+            NavItem("android-lab", "Android lab", NavAction.PlaybackLab),
+            NavItem("updates", "Check for updates", NavAction.CheckUpdates),
+        )
+    }
 
     /** Bundled markdown paths (APK assets + cache keys). */
     val bundledMarkdownPaths: List<String> = listOf(
+        "content/app.md",
         "content/setup.md",
         "content/legal.md",
         "content/motivation.md",

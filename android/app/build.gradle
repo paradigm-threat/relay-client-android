@@ -37,8 +37,8 @@ android {
         // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
         // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 32
-        versionName "1.0.32"
+        versionCode 38
+        versionName "1.0.38"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -265,10 +265,15 @@ dependencies {
     implementation "androidx.core:core-ktx:1.10.1"
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.drawerlayout:drawerlayout:1.2.0"
+    implementation "androidx.lifecycle:lifecycle-process:2.6.2"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.2"
     implementation "com.google.android.material:material:1.9.0"
 
     // For JSON handling
     implementation "com.google.code.gson:gson:2.10.1"
+
+    // Chat WebSocket → flashback chat-edge (/chat/ws)
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 
     // ExoPlayer (Media3) — hardware decode + MediaSession for headset transport
     implementation "androidx.media3:media3-exoplayer:1.1.1"

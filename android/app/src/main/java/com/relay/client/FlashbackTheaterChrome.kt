@@ -3,10 +3,7 @@ package com.relay.client
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.Shader
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
@@ -14,16 +11,20 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageView
 
 /**
  * Web-parity theatre atmosphere for the Flashback shell:
- * vertical-tiling wall texture + left/right sconce columns, soft screen wash.
- * Pointer-events none — sits behind content; hide while fullscreen theater plays.
+ * full-bleed cover backdrop (mobile/tablet/desktop/wide via resource qualifiers)
+ * plus a soft screen wash. Hide while fullscreen theater plays.
+ *
+ * Theme ids match web `flashback.theaterTheme.v1`: velvet (default) / classic.
  */
 object FlashbackTheaterChrome {
 
     private val house = Color.parseColor("#0d0505")
-    private val glowCenter = Color.parseColor("#2Ed4a574") // ~18% warm gold
+    private val glowCenter = Color.parseColor("#1Fd4a574") // ~12% warm gold
+    private const val TAG_BACKDROP_IMAGE = "fb_theater_bg_image"
 
     fun houseBackground(): GradientDrawable =
         GradientDrawable().apply {
@@ -50,19 +51,39 @@ object FlashbackTheaterChrome {
             ),
         )
 
+    fun backdropDrawableRes(theme: String): Int =
+        when (FlashbackTheaterPrefs.normalize(theme)) {
+            FlashbackTheaterPrefs.THEME_CLASSIC -> R.drawable.fb_theater_bg_classic
+            else -> R.drawable.fb_theater_bg_velvet
+        }
+
     fun createBackdrop(context: Context): View {
         val root = FrameLayout(context).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
-            background = tiledDrawable(context, com.relay.client.R.drawable.fb_wall_texture)
+            setBackgroundColor(house)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             isClickable = false
             isFocusable = false
         }
 
-        // Soft projector wash
+        val theme = FlashbackTheaterPrefs.theme(context)
+        root.addView(
+            ImageView(context).apply {
+                tag = TAG_BACKDROP_IMAGE
+                setImageResource(backdropDrawableRes(theme))
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                )
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            },
+        )
+
+        // Soft projector wash (matches web .fb-screen-glow)
         root.addView(
             View(context).apply {
                 background = GradientDrawable().apply {
@@ -76,41 +97,30 @@ object FlashbackTheaterChrome {
                     dp(context, 280),
                     Gravity.TOP or Gravity.CENTER_HORIZONTAL,
                 ).apply { topMargin = dp(context, 48) }
-                alpha = 0.85f
-                startBreathe(this, 0.55f, 0.95f, 5500L, 0L)
+                alpha = 0.7f
+                startBreathe(this, 0.45f, 0.85f, 5500L, 0L)
             },
         )
 
-        root.addView(wallColumn(context, left = true))
-        root.addView(wallColumn(context, left = false))
         return root
     }
 
-    private fun wallColumn(context: Context, left: Boolean): View {
-        val res =
-            if (left) {
-                com.relay.client.R.drawable.fb_wall_sconce_left
-            } else {
-                com.relay.client.R.drawable.fb_wall_sconce_right
-            }
-        return View(context).apply {
-            background = tiledDrawable(context, res)
-            layoutParams = FrameLayout.LayoutParams(
-                dp(context, 96),
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                if (left) Gravity.START else Gravity.END,
-            )
-            alpha = 0.95f
-            startBreathe(this, 0.82f, 1f, 7500L, if (left) 0L else 1600L)
-        }
+    /** Apply persisted (or explicit) theme to an existing backdrop root. */
+    fun applyTheme(backdropRoot: View, theme: String? = null) {
+        val ctx = backdropRoot.context
+        val t = theme?.let { FlashbackTheaterPrefs.normalize(it) } ?: FlashbackTheaterPrefs.theme(ctx)
+        val image = findBackdropImage(backdropRoot) ?: return
+        image.setImageResource(backdropDrawableRes(t))
     }
 
-    private fun tiledDrawable(context: Context, resId: Int): BitmapDrawable {
-        val bitmap = BitmapFactory.decodeResource(context.resources, resId)
-        return BitmapDrawable(context.resources, bitmap).apply {
-            setTileModeXY(Shader.TileMode.CLAMP, Shader.TileMode.REPEAT)
-            gravity = Gravity.FILL_HORIZONTAL or Gravity.TOP
+    private fun findBackdropImage(root: View): ImageView? {
+        if (root is ImageView && root.tag == TAG_BACKDROP_IMAGE) return root
+        if (root is ViewGroup) {
+            for (i in 0 until root.childCount) {
+                findBackdropImage(root.getChildAt(i))?.let { return it }
+            }
         }
+        return null
     }
 
     private fun startBreathe(view: View, from: Float, to: Float, durationMs: Long, delayMs: Long) {

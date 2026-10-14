@@ -1,14 +1,17 @@
 package com.relay.client
 
+import android.Manifest
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -28,6 +31,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.clevertree.relayruntime.demo.ExternalMediaIntents
@@ -79,10 +84,15 @@ class FlashbackNativeShell(
     private val bugFooter: View
     private val theatreBackdrop: View
 
+    private var chatListener: FlashbackChatSession.Listener? = null
+    private var chatActiveChannel: String = FlashbackChatApi.DEFAULT_CHANNEL
+    private var chatChannelCatalog: List<FlashbackChatChannel> = emptyList()
+
     init {
         background = FlashbackTheaterChrome.houseBackground()
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         RelayMediaUrls.fetchBaseUrl = origin.trim().trimEnd('/')
+        FlashbackChatRuntime.bind(context, origin)
 
         wideLayout = isWideLayout(resources.configuration)
         contentHost.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
@@ -223,7 +233,16 @@ class FlashbackNativeShell(
                 showLibrary()
                 true
             }
-            "markdown", "lab", "bug-report" -> {
+            "markdown", "lab", "bug-report", "chat-notify" -> {
+                if (currentScreen == "chat-notify") {
+                    showChat(chatActiveChannel)
+                } else {
+                    leaveOverlay()
+                }
+                true
+            }
+            "chat" -> {
+                detachChatListener()
                 leaveOverlay()
                 true
             }
@@ -268,6 +287,9 @@ class FlashbackNativeShell(
     }
 
     private fun clear() {
+        if (currentScreen == "chat" || currentScreen == "chat-notify") {
+            detachChatListener()
+        }
         playerView?.releasePlayer()
         playerView = null
         contentHost.removeAllViews()
@@ -560,7 +582,7 @@ class FlashbackNativeShell(
                 setPadding(0, 0, 0, dp(16))
             },
         )
-        for (item in FlashbackSiteContent.drawerItems) {
+        for (item in FlashbackSiteContent.drawerItems(context)) {
             col.addView(
                 TextView(context).apply {
                     text = item.title
@@ -569,6 +591,7 @@ class FlashbackNativeShell(
                     setPadding(dp(8), dp(14), dp(8), dp(14))
                     setOnClickListener { onDrawerItem(item) }
                     FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, item.title)
+                    if (item.id == "theme") tag = "fb_drawer_theme"
                 },
             )
         }
@@ -588,8 +611,40 @@ class FlashbackNativeShell(
                 showMarkdownDoc(action.title, action.path)
             is FlashbackSiteContent.NavAction.PlaybackLab -> showPlaybackLab()
             is FlashbackSiteContent.NavAction.Board -> showBugReportForm()
+            is FlashbackSiteContent.NavAction.Chat -> showChat(null)
             is FlashbackSiteContent.NavAction.CheckUpdates -> maybeCheckForUpdates(silent = false)
+            is FlashbackSiteContent.NavAction.CycleTheaterTheme -> cycleTheaterTheme()
         }
+    }
+
+    private fun cycleTheaterTheme() {
+        val next = FlashbackTheaterPrefs.cycle(context)
+        FlashbackTheaterChrome.applyTheme(theatreBackdrop, next)
+        refreshDrawerThemeLabel()
+        Toast.makeText(
+            context,
+            "Theater theme: ${FlashbackTheaterPrefs.label(next)}",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+
+    private fun refreshDrawerThemeLabel() {
+        val label = "Theme: ${FlashbackTheaterPrefs.label(FlashbackTheaterPrefs.theme(context))}"
+        fun walk(v: View) {
+            if (v.tag == "fb_drawer_theme" && v is TextView) {
+                v.text = label
+                return
+            }
+            if (v is ViewGroup) {
+                for (i in 0 until v.childCount) walk(v.getChildAt(i))
+            }
+        }
+        walk(drawerPanel)
+    }
+
+    /** Open native IRC chat (notification deep-link / menu). */
+    fun openChat(channel: String?) {
+        showChat(channel)
     }
 
     private fun topBar(): LinearLayout {
@@ -1454,6 +1509,26 @@ class FlashbackNativeShell(
                 maybeCheckForUpdates(silent = false)
             },
         )
+        col.addView(sectionTitle("Theater theme"))
+        col.addView(
+            body(
+                "Velvet (illustrated curtains) is the default. Classic is the photo aisle. " +
+                    "Same choice as the web header Theme control.",
+            ),
+        )
+        val themeStatus = body(
+            "Current: ${FlashbackTheaterPrefs.label(FlashbackTheaterPrefs.theme(context))}",
+        )
+        col.addView(themeStatus)
+        col.addView(
+            secondaryButton("Switch theater theme") {
+                val next = FlashbackTheaterPrefs.cycle(context)
+                FlashbackTheaterChrome.applyTheme(theatreBackdrop, next)
+                refreshDrawerThemeLabel()
+                themeStatus.text = "Current: ${FlashbackTheaterPrefs.label(next)}"
+            },
+        )
+
         col.addView(sectionTitle("Subtitles"))
         col.addView(
             body(
@@ -1724,9 +1799,387 @@ class FlashbackNativeShell(
     private fun refreshBugFooterVisibility() {
         val show = !inTheater &&
             currentScreen != "bug-report" &&
+            currentScreen != "chat" &&
+            currentScreen != "chat-notify" &&
             !bugFooterDismissedThisSession &&
             FlashbackBugReport.shouldShowFooter(context)
         bugFooter.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    private fun detachChatListener() {
+        val session = FlashbackChatSession.peek()
+        chatListener?.let { session?.removeListener(it) }
+        chatListener = null
+        session?.setFocusedChannel(null)
+    }
+
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33) return
+        val act = activity() ?: return
+        if (ContextCompat.checkSelfPermission(act, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        ActivityCompat.requestPermissions(
+            act,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            4101,
+        )
+    }
+
+    private fun showChat(channel: String?) {
+        detachChatListener()
+        clear()
+        currentScreen = "chat"
+        inTheater = false
+        activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        exitImmersive()
+        setDrawerEnabled(true)
+        refreshBugFooterVisibility()
+        FlashbackChatNotifier.ensureChannel(context)
+        ensureNotificationPermission()
+
+        chatActiveChannel =
+            FlashbackChatApi.normalizeChannel(
+                channel ?: chatActiveChannel.ifBlank { FlashbackChatApi.DEFAULT_CHANNEL },
+            )
+
+        val session = FlashbackChatSession.get(context, origin)
+        session.start()
+        session.setActiveChannel(chatActiveChannel)
+        session.setFocusedChannel(chatActiveChannel)
+
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT,
+            )
+            background = FlashbackTheaterChrome.contentScrim()
+        }
+        root.addView(topBar())
+
+        val chatServerHost =
+            try {
+                java.net.URI(origin.trim()).host?.ifBlank { null }
+            } catch (_: Exception) {
+                null
+            } ?: origin.trim().trimEnd('/').removePrefix("https://").removePrefix("http://")
+                .substringBefore('/')
+        fun connectedStatus(): String = "Connected to $chatServerHost"
+        val status = TextView(context).apply {
+            setTextColor(creamMuted)
+            textSize = 13f
+            setPadding(dp(18), dp(4), dp(18), dp(4))
+            text = "Connecting…"
+        }
+        val topicView = TextView(context).apply {
+            setTextColor(creamMuted)
+            textSize = 13f
+            text = "#$chatActiveChannel"
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val notifyBtn = TextView(context).apply {
+            text = "Notify…"
+            setTextColor(gold)
+            textSize = 14f
+            setPadding(dp(12), dp(6), dp(4), dp(6))
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            setOnClickListener { showChatNotifySettings() }
+            FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, "Chat notifications")
+        }
+        val topicRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), 0, dp(14), dp(4))
+            addView(topicView)
+            addView(notifyBtn)
+        }
+        val chipRow = HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+        }
+        val chips = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        chipRow.addView(chips)
+
+        val msgScroll = ScrollView(context).apply {
+            isFillViewport = true
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f,
+            )
+        }
+        val msgCol = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(8), dp(18), dp(12))
+        }
+        msgScroll.addView(msgCol)
+
+        fun appendMessage(msg: FlashbackChatMessage) {
+            if (msg.channel != chatActiveChannel) return
+            val line = TextView(context).apply {
+                setTextColor(cream)
+                textSize = 15f
+                setPadding(0, dp(4), 0, dp(4))
+                setTextIsSelectable(true)
+                text =
+                    if (msg.kind == "action") {
+                        "* ${msg.nick} ${msg.text}"
+                    } else {
+                        "<${msg.nick}> ${msg.text}"
+                    }
+            }
+            msgCol.addView(line)
+            msgScroll.post { msgScroll.fullScroll(View.FOCUS_DOWN) }
+        }
+
+        fun rebuildChips() {
+            chips.removeAllViews()
+            val names =
+                (listOf(FlashbackChatApi.DEFAULT_CHANNEL) + chatChannelCatalog.map { it.name })
+                    .distinct()
+            for (name in names) {
+                val active = name == chatActiveChannel
+                chips.addView(
+                    TextView(context).apply {
+                        text = "#$name"
+                        setTextColor(if (active) gold else creamMuted)
+                        textSize = 14f
+                        setPadding(dp(10), dp(8), dp(10), dp(8))
+                        setOnClickListener {
+                            chatActiveChannel = name
+                            session.setActiveChannel(name)
+                            session.setFocusedChannel(name)
+                            topicView.text = "#$name"
+                            msgCol.removeAllViews()
+                            rebuildChips()
+                            Thread {
+                                val hist = FlashbackChatApi.fetchHistory(origin, name, 80)
+                                main.post {
+                                    if (chatActiveChannel != name) return@post
+                                    msgCol.removeAllViews()
+                                    hist.forEach { appendMessage(it) }
+                                }
+                            }.start()
+                        }
+                        FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, "#$name")
+                    },
+                )
+            }
+        }
+
+        val nickInput = EditText(context).apply {
+            hint = "Nick"
+            setText(session.currentNick().ifBlank { FlashbackChatPrefs.nick(context) })
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+            setBackgroundColor(Color.parseColor("#1a0a0c"))
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setSingleLine(true)
+            layoutParams = LinearLayout.LayoutParams(dp(120), ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        val input = EditText(context).apply {
+            hint = "Message"
+            setTextColor(cream)
+            setHintTextColor(creamMuted)
+            setBackgroundColor(Color.parseColor("#1a0a0c"))
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setSingleLine(true)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val sendBtn = Button(context).apply {
+            text = "Send"
+            isAllCaps = false
+            setTextColor(gold)
+            FlashbackFocus.decorate(this, FlashbackFocus.Style.PRIMARY, "Send")
+            setOnClickListener {
+                val text = input.text?.toString().orEmpty().trim()
+                if (text.isEmpty()) return@setOnClickListener
+                val nick = nickInput.text?.toString().orEmpty().trim()
+                if (nick.length >= 2 && nick != session.currentNick()) {
+                    session.changeNick(nick)
+                }
+                session.privmsg(chatActiveChannel, text)
+                input.setText("")
+            }
+        }
+        val composer = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(16))
+            addView(nickInput)
+            addView(input)
+            addView(sendBtn)
+        }
+
+        root.addView(status)
+        root.addView(topicRow)
+        root.addView(chipRow)
+        root.addView(msgScroll)
+        root.addView(composer)
+        contentHost.addView(root)
+        rebuildChips()
+        FlashbackFocus.seedFocus(input)
+
+        val listener =
+            object : FlashbackChatSession.Listener {
+                override fun onState(state: String) {
+                    status.text =
+                        when (state) {
+                            "connecting" -> "Connecting…"
+                            "open" -> connectedStatus()
+                            "closed", "error" -> "Reconnecting…"
+                            "stopped" -> "Disconnected"
+                            else -> state
+                        }
+                    if (session.currentNick().isNotBlank() && nickInput.text.isNullOrBlank()) {
+                        nickInput.setText(session.currentNick())
+                    }
+                }
+
+                override fun onHello(nick: String) {
+                    status.text = connectedStatus()
+                    if (nickInput.text.isNullOrBlank()) nickInput.setText(nick)
+                }
+
+                override fun onMessage(msg: FlashbackChatMessage) {
+                    appendMessage(msg)
+                }
+
+                override fun onTopic(channel: String, topic: String) {
+                    if (channel == chatActiveChannel && topic.isNotBlank()) {
+                        topicView.text = "#$channel — $topic"
+                    }
+                }
+            }
+        chatListener = listener
+        session.addListener(listener)
+        status.text = if (session.isConnected()) connectedStatus() else "Connecting…"
+
+        Thread {
+            val health = FlashbackChatApi.fetchHealth(origin)
+            val channels = FlashbackChatApi.fetchChannels(origin)
+            val hist = FlashbackChatApi.fetchHistory(origin, chatActiveChannel, 80)
+            main.post {
+                if (currentScreen != "chat") return@post
+                chatChannelCatalog = channels
+                rebuildChips()
+                if (!health) {
+                    status.text = "Chat edge unavailable — retrying…"
+                }
+                msgCol.removeAllViews()
+                hist.forEach { appendMessage(it) }
+            }
+        }.start()
+    }
+
+    private fun showChatNotifySettings() {
+        detachChatListener()
+        clear()
+        currentScreen = "chat-notify"
+        inTheater = false
+        activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        exitImmersive()
+        setDrawerEnabled(true)
+        refreshBugFooterVisibility()
+        ensureNotificationPermission()
+        FlashbackChatNotifier.ensureChannel(context)
+
+        val col = column()
+        val back = TextView(context).apply {
+            text = "← Back to chat"
+            setTextColor(gold)
+            textSize = 15f
+            setPadding(dp(4), dp(8), dp(4), dp(12))
+            setOnClickListener { showChat(chatActiveChannel) }
+            FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, "Back to chat")
+        }
+        col.addView(back)
+        col.addView(heading("Chat notifications"))
+        col.addView(
+            body(
+                "Every public channel is listed below — opt in to the ones you care about. " +
+                    "Alerts coalesce into one digest (quiet window: " +
+                    "${FlashbackChatPrefs.quietMinutes(context)} minutes between alert sounds). " +
+                    "IRC stays realtime while the app is open; background listen is opt-in.",
+            ),
+        )
+
+        val bgBox = CheckBox(context).apply {
+            text = "Keep listening in background (uses a persistent notification)"
+            setTextColor(cream)
+            isChecked = FlashbackChatPrefs.listenWhileBackground(context)
+            FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, "Background listen")
+            setOnCheckedChangeListener { _, checked ->
+                FlashbackChatPrefs.setListenWhileBackground(context, checked)
+                FlashbackChatRuntime.onNotifyPrefsChanged()
+                if (checked) ensureNotificationPermission()
+            }
+        }
+        col.addView(bgBox)
+
+        col.addView(sectionTitle("Channels"))
+        val listHost = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        var allChannels: List<FlashbackChatChannel> = emptyList()
+
+        fun rebuildChecks() {
+            listHost.removeAllViews()
+            val selected = FlashbackChatPrefs.notifyChannels(context).toMutableSet()
+            for (ch in allChannels) {
+                listHost.addView(
+                    CheckBox(context).apply {
+                        text = "#${ch.name}" +
+                            if (ch.topic.isNotBlank()) " — ${ch.topic}" else ""
+                        setTextColor(cream)
+                        isChecked = ch.name in selected
+                        FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, "#${ch.name}")
+                        setOnCheckedChangeListener { _, checked ->
+                            val next = FlashbackChatPrefs.notifyChannels(context).toMutableSet()
+                            if (checked) next.add(ch.name) else next.remove(ch.name)
+                            FlashbackChatPrefs.setNotifyChannels(context, next)
+                            FlashbackChatSession.peek()?.refreshJoinsFromPrefs()
+                            if (checked) ensureNotificationPermission()
+                        }
+                    },
+                )
+            }
+            if (allChannels.isEmpty()) {
+                listHost.addView(body("Loading channels…"))
+            }
+        }
+
+        col.addView(
+            secondaryButton("Clear all watches") {
+                FlashbackChatPrefs.selectNone(context)
+                FlashbackChatSession.peek()?.refreshJoinsFromPrefs()
+                FlashbackChatRuntime.onNotifyPrefsChanged()
+                rebuildChecks()
+            },
+        )
+        col.addView(listHost)
+        wrapScroll(col, back)
+
+        Thread {
+            val channels = FlashbackChatApi.fetchChannels(origin)
+            main.post {
+                if (currentScreen != "chat-notify") return@post
+                allChannels =
+                    if (channels.isEmpty()) {
+                        listOf(FlashbackChatChannel(FlashbackChatApi.DEFAULT_CHANNEL, "Lobby"))
+                    } else {
+                        channels
+                    }
+                chatChannelCatalog = allChannels
+                rebuildChecks()
+            }
+        }.start()
     }
 
     private fun boardPagePath(): String {
