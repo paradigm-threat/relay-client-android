@@ -10,6 +10,7 @@ import kotlin.math.abs
 
 /**
  * APK lobby OST — on by default when foreground and not in theater.
+ * Enabled flag persisted via [FlashbackLobbyPrefs] (SharedPreferences).
  */
 class FlashbackLobbyAudio(
     private val context: Context,
@@ -25,11 +26,13 @@ class FlashbackLobbyAudio(
     private var queueIdx = 0
     private var activeSong = ""
     private var theater = false
-    private var enabled = true
+    private var enabled: Boolean = FlashbackLobbyPrefs.isEnabled(context)
     private var foreground = true
     private var targetVol = 0.28f
     private var fadeRunnable: Runnable? = null
     private var currentVol = 0f
+
+    fun isEnabled(): Boolean = enabled
 
     fun setTheater(on: Boolean) {
         theater = on
@@ -38,6 +41,8 @@ class FlashbackLobbyAudio(
 
     fun setEnabled(on: Boolean) {
         enabled = on
+        FlashbackLobbyPrefs.setEnabled(context, on)
+        Log.i(TAG, "enabled=$on (persisted)")
         apply()
     }
 

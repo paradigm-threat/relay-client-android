@@ -21,6 +21,7 @@ class FlashbackSiteContentTest {
                 "legal",
                 "terms",
                 "theme",
+                "lobby-music",
                 "seeding",
                 "android-lab",
                 "updates",
@@ -33,6 +34,9 @@ class FlashbackSiteContentTest {
         val theme = FlashbackSiteContent.drawerItems().first { it.id == "theme" }
         assertTrue(theme.title.startsWith("Theme:"))
         assertTrue(theme.action is FlashbackSiteContent.NavAction.CycleTheaterTheme)
+        val lobby = FlashbackSiteContent.drawerItems().first { it.id == "lobby-music" }
+        assertEquals("Lobby music: on", lobby.title)
+        assertTrue(lobby.action is FlashbackSiteContent.NavAction.ToggleLobbyMusic)
         val board = FlashbackSiteContent.drawerItems().first { it.id == "board" }
         assertEquals("Report a bug", board.title)
         assertTrue(board.action is FlashbackSiteContent.NavAction.Board)

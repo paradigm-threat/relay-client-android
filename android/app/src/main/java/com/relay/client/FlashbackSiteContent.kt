@@ -19,6 +19,7 @@ object FlashbackSiteContent {
         object Chat : NavAction()
         object CheckUpdates : NavAction()
         object CycleTheaterTheme : NavAction()
+        object ToggleLobbyMusic : NavAction()
     }
 
     data class NavItem(
@@ -45,6 +46,13 @@ object FlashbackSiteContent {
             NavItem("legal", "Legal", NavAction.Markdown("Ownership policy", "content/legal.md")),
             NavItem("terms", "Terms", NavAction.Markdown("Terms", "content/terms.md")),
             NavItem("theme", "Theme: $themeLabel", NavAction.CycleTheaterTheme),
+            NavItem(
+                "lobby-music",
+                FlashbackLobbyPrefs.label(
+                    if (context != null) FlashbackLobbyPrefs.isEnabled(context) else true,
+                ),
+                NavAction.ToggleLobbyMusic,
+            ),
             NavItem("seeding", "Downloads & seeding", NavAction.SeedingManage),
             NavItem("android-lab", "Android lab", NavAction.PlaybackLab),
             NavItem("updates", "Check for updates", NavAction.CheckUpdates),

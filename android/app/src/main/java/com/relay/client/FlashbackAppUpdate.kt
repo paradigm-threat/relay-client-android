@@ -11,6 +11,7 @@ import com.google.gson.JsonParser
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Remote version metadata for Flashback APK self-update.
@@ -35,6 +36,9 @@ object FlashbackAppUpdate {
     private const val PREFS = "flashback-app-update"
     private const val KEY_DISMISS_UNTIL = "dismissUntilMs"
     private const val DAY_MS = 24L * 60L * 60L * 1000L
+
+    /** Blocks overlapping download / PackageInstaller sessions (double-tap Install). */
+    private val installInFlight = AtomicBoolean(false)
 
     fun manifestUrl(origin: String): String {
         val base = origin.trim().trimEnd('/')
@@ -134,44 +138,86 @@ object FlashbackAppUpdate {
         NEEDS_UNKNOWN_SOURCES,
         /** Download or Intent failed — caller may open the HTTPS APK URL. */
         FAILED,
+        /** Another install/download is already running — ignore duplicate taps. */
+        ALREADY_IN_PROGRESS,
+    }
+
+    /** True while a download or installer launch is underway. */
+    fun isInstallInFlight(): Boolean = installInFlight.get()
+
+    /**
+     * Acquire the install gate on the UI thread before spawning a download worker.
+     * Pair with [installApk] using `gateAlreadyHeld = true`.
+     */
+    fun tryBeginInstall(): Boolean = installInFlight.compareAndSet(false, true)
+
+    /** Test helper — clears the install gate. */
+    internal fun resetInstallGateForTests() {
+        installInFlight.set(false)
     }
 
     /**
      * Download [apkUrl] into app cache and launch the package installer.
      * On Android 8+, opens “Install unknown apps” for this package if needed.
+     * Concurrent calls return [InstallResult.ALREADY_IN_PROGRESS] unless
+     * [gateAlreadyHeld] (caller already succeeded at [tryBeginInstall]).
      */
-    fun installApk(activity: Activity, apkUrl: String): InstallResult {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !activity.packageManager.canRequestPackageInstalls()
-        ) {
-            val settings = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${activity.packageName}"),
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    fun installApk(
+        activity: Activity,
+        apkUrl: String,
+        gateAlreadyHeld: Boolean = false,
+    ): InstallResult {
+        if (!gateAlreadyHeld && !installInFlight.compareAndSet(false, true)) {
+            return InstallResult.ALREADY_IN_PROGRESS
+        }
+        // Keep the gate held through download + installer launch so a second tap
+        // cannot overwrite the staging APK or open a second PackageInstaller session.
+        var releaseGate = true
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !activity.packageManager.canRequestPackageInstalls()
+            ) {
+                val settings = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${activity.packageName}"),
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                return try {
+                    activity.startActivity(settings)
+                    InstallResult.NEEDS_UNKNOWN_SOURCES
+                } catch (_: Exception) {
+                    InstallResult.FAILED
+                }
+            }
+
             return try {
-                activity.startActivity(settings)
-                InstallResult.NEEDS_UNKNOWN_SOURCES
+                val file = downloadApkToCache(activity, apkUrl)
+                val uri = FileProvider.getUriForFile(
+                    activity,
+                    "${activity.packageName}.fileprovider",
+                    file,
+                )
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                activity.startActivity(intent)
+                // Hold briefly so a double-tap right as the installer opens cannot
+                // start a second staging session that races the first.
+                releaseGate = false
+                InstallResult.STARTED_INSTALLER
             } catch (_: Exception) {
                 InstallResult.FAILED
             }
-        }
-
-        return try {
-            val file = downloadApkToCache(activity, apkUrl)
-            val uri = FileProvider.getUriForFile(
-                activity,
-                "${activity.packageName}.fileprovider",
-                file,
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } finally {
+            if (releaseGate) {
+                installInFlight.set(false)
+            } else {
+                // Release after installer UI has had time to take ownership of the APK.
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    installInFlight.set(false)
+                }, 60_000L)
             }
-            activity.startActivity(intent)
-            InstallResult.STARTED_INSTALLER
-        } catch (_: Exception) {
-            InstallResult.FAILED
         }
     }
 
@@ -190,8 +236,8 @@ object FlashbackAppUpdate {
 
     private fun downloadApkToCache(context: Context, apkUrl: String): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val out = File(dir, "flashback-update.apk")
-        if (out.exists()) out.delete()
+        // Unique name so a cancelled/stale installer cannot share a half-written file.
+        val out = File(dir, "flashback-update-${System.nanoTime()}.apk")
         val conn = URL(apkUrl).openConnection() as HttpURLConnection
         conn.requestMethod = "GET"
         conn.connectTimeout = 30_000

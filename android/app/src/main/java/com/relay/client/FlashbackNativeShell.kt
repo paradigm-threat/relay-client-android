@@ -660,6 +660,7 @@ class FlashbackNativeShell(
                     setOnClickListener { onDrawerItem(item) }
                     FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, item.title)
                     if (item.id == "theme") tag = "fb_drawer_theme"
+                    if (item.id == "lobby-music") tag = "fb_drawer_lobby_music"
                 },
             )
         }
@@ -683,6 +684,7 @@ class FlashbackNativeShell(
             is FlashbackSiteContent.NavAction.Chat -> showChat(null)
             is FlashbackSiteContent.NavAction.CheckUpdates -> maybeCheckForUpdates(silent = false)
             is FlashbackSiteContent.NavAction.CycleTheaterTheme -> cycleTheaterTheme()
+            is FlashbackSiteContent.NavAction.ToggleLobbyMusic -> toggleLobbyMusic()
         }
     }
 
@@ -695,6 +697,32 @@ class FlashbackNativeShell(
             "Theater theme: ${FlashbackTheaterPrefs.label(next)}",
             Toast.LENGTH_SHORT,
         ).show()
+    }
+
+    private fun toggleLobbyMusic() {
+        ensureLobbyAudio()
+        val next = FlashbackLobbyPrefs.toggle(context)
+        lobbyAudio?.setEnabled(next)
+        refreshDrawerLobbyMusicLabel()
+        Toast.makeText(
+            context,
+            FlashbackLobbyPrefs.label(next),
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+
+    private fun refreshDrawerLobbyMusicLabel() {
+        val label = FlashbackLobbyPrefs.label(FlashbackLobbyPrefs.isEnabled(context))
+        fun scan(root: View?) {
+            if (root == null) return
+            if (root.tag == "fb_drawer_lobby_music" && root is TextView) {
+                root.text = label
+            }
+            if (root is ViewGroup) {
+                for (i in 0 until root.childCount) scan(root.getChildAt(i))
+            }
+        }
+        scan(drawerPanel)
     }
 
     private fun refreshDrawerThemeLabel() {
@@ -2678,17 +2706,30 @@ class FlashbackNativeShell(
                         .show()
                 }
                 FlashbackAppUpdate.InstallResult.FAILED -> openApkFallback(apkUrl)
+                FlashbackAppUpdate.InstallResult.ALREADY_IN_PROGRESS ->
+                    Toast.makeText(context, "Update already in progress…", Toast.LENGTH_SHORT).show()
                 FlashbackAppUpdate.InstallResult.STARTED_INSTALLER -> Unit
             }
             return
         }
+        // Acquire on the UI thread so a double-tap cannot spawn two downloaders.
+        if (!FlashbackAppUpdate.tryBeginInstall()) {
+            Toast.makeText(context, "Update already in progress…", Toast.LENGTH_SHORT).show()
+            return
+        }
         Toast.makeText(context, "Downloading update…", Toast.LENGTH_SHORT).show()
         Thread {
-            val result = FlashbackAppUpdate.installApk(act, apkUrl)
+            val result = FlashbackAppUpdate.installApk(act, apkUrl, gateAlreadyHeld = true)
             main.post {
                 when (result) {
                     FlashbackAppUpdate.InstallResult.STARTED_INSTALLER -> Unit
                     FlashbackAppUpdate.InstallResult.NEEDS_UNKNOWN_SOURCES -> Unit
+                    FlashbackAppUpdate.InstallResult.ALREADY_IN_PROGRESS ->
+                        Toast.makeText(
+                            context,
+                            "Update already in progress…",
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     FlashbackAppUpdate.InstallResult.FAILED -> openApkFallback(apkUrl)
                 }
             }

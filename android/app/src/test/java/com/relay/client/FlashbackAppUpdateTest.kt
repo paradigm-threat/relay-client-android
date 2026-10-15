@@ -123,4 +123,16 @@ class FlashbackAppUpdateTest {
             FlashbackAppUpdate.manifestUrl("https://flashbackrepository.org/"),
         )
     }
+
+    @Test
+    fun tryBeginInstallRejectsConcurrentAcquire() {
+        FlashbackAppUpdate.resetInstallGateForTests()
+        assertTrue(FlashbackAppUpdate.tryBeginInstall())
+        assertTrue(FlashbackAppUpdate.isInstallInFlight())
+        assertFalse(FlashbackAppUpdate.tryBeginInstall())
+        FlashbackAppUpdate.resetInstallGateForTests()
+        assertFalse(FlashbackAppUpdate.isInstallInFlight())
+        assertTrue(FlashbackAppUpdate.tryBeginInstall())
+        FlashbackAppUpdate.resetInstallGateForTests()
+    }
 }
