@@ -108,13 +108,13 @@ class FlashbackNativeShell(
             val side = FrameLayout(context).apply {
                 background = FlashbackTheaterChrome.sidebarBackground()
                 layoutParams = LinearLayout.LayoutParams(
-                    dp(280),
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
                 addView(
                     drawerPanel,
                     FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.MATCH_PARENT,
                     ),
                 )
@@ -158,7 +158,7 @@ class FlashbackNativeShell(
             )
             dl.addView(contentHost)
             drawerPanel.layoutParams = DrawerLayout.LayoutParams(
-                dp(300),
+                ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 GravityCompat.START,
             )
@@ -621,23 +621,30 @@ class FlashbackNativeShell(
     private fun buildNavDrawer(): View {
         val scroll = ScrollView(context).apply {
             background = FlashbackTheaterChrome.sidebarBackground()
-            isFillViewport = true
+            isFillViewport = false
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
         }
         val col = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(28), dp(16), dp(28))
+            // Tight rail: text + modest pad only (no fixed-width stretch).
+            setPadding(dp(12), dp(16), dp(12), dp(16))
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
         }
         col.addView(
             ImageView(context).apply {
                 setImageResource(com.relay.client.R.drawable.fb_logo_header)
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_START
-                // 40% of former full-rail width (sidebar/drawer minus horizontal padding).
-                val railInnerDp = (if (wideLayout) 280 else 300) - 32
                 layoutParams = LinearLayout.LayoutParams(
-                    dp((railInnerDp * 0.4f).toInt()),
+                    dp(96),
                     ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { bottomMargin = dp(8) }
+                ).apply { bottomMargin = dp(6) }
                 contentDescription = "Flashback Repository"
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             },
@@ -646,8 +653,12 @@ class FlashbackNativeShell(
             TextView(context).apply {
                 text = "Menu"
                 setTextColor(creamMuted)
-                textSize = 13f
-                setPadding(0, 0, 0, dp(16))
+                textSize = 12f
+                setPadding(0, 0, 0, dp(6))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
             },
         )
         for (item in FlashbackSiteContent.drawerItems(context)) {
@@ -655,8 +666,12 @@ class FlashbackNativeShell(
                 TextView(context).apply {
                     text = item.title
                     setTextColor(cream)
-                    textSize = 16f
-                    setPadding(dp(8), dp(14), dp(8), dp(14))
+                    textSize = 15f
+                    setPadding(dp(4), dp(6), dp(4), dp(6))
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
                     setOnClickListener { onDrawerItem(item) }
                     FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, item.title)
                     if (item.id == "theme") tag = "fb_drawer_theme"

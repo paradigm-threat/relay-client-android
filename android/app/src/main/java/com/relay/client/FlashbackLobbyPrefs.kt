@@ -25,7 +25,7 @@ object FlashbackLobbyPrefs {
     }
 
     fun label(enabled: Boolean): String =
-        if (enabled) "Lobby music: on" else "Lobby music: off"
+        if (enabled) "Music: on" else "Music: off"
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

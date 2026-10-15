@@ -41,7 +41,7 @@ object FlashbackSiteContent {
             NavItem("request", "Request", NavAction.Markdown("Request downloads", "content/request.md")),
             NavItem("motivation", "Why", NavAction.Markdown("Why we’re doing this", "content/motivation.md")),
             NavItem("submit", "Submit", NavAction.Markdown("Submissions", "content/submit.md")),
-            NavItem("board", "Report a bug", NavAction.Board),
+            NavItem("board", "Bugs", NavAction.Board),
             NavItem("chat", "Chat", NavAction.Chat),
             NavItem("legal", "Legal", NavAction.Markdown("Ownership policy", "content/legal.md")),
             NavItem("terms", "Terms", NavAction.Markdown("Terms", "content/terms.md")),
@@ -53,9 +53,9 @@ object FlashbackSiteContent {
                 ),
                 NavAction.ToggleLobbyMusic,
             ),
-            NavItem("seeding", "Downloads & seeding", NavAction.SeedingManage),
-            NavItem("android-lab", "Android lab", NavAction.PlaybackLab),
-            NavItem("updates", "Check for updates", NavAction.CheckUpdates),
+            NavItem("seeding", "Downloads", NavAction.SeedingManage),
+            NavItem("android-lab", "Lab", NavAction.PlaybackLab),
+            NavItem("updates", "Updates", NavAction.CheckUpdates),
         )
     }
 

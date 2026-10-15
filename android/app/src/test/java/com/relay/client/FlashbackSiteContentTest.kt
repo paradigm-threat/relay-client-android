@@ -29,17 +29,21 @@ class FlashbackSiteContentTest {
             ids,
         )
         val seeding = FlashbackSiteContent.drawerItems().first { it.id == "seeding" }
-        assertEquals("Downloads & seeding", seeding.title)
+        assertEquals("Downloads", seeding.title)
         assertTrue(seeding.action is FlashbackSiteContent.NavAction.SeedingManage)
         val theme = FlashbackSiteContent.drawerItems().first { it.id == "theme" }
         assertTrue(theme.title.startsWith("Theme:"))
         assertTrue(theme.action is FlashbackSiteContent.NavAction.CycleTheaterTheme)
         val lobby = FlashbackSiteContent.drawerItems().first { it.id == "lobby-music" }
-        assertEquals("Lobby music: on", lobby.title)
+        assertEquals("Music: on", lobby.title)
         assertTrue(lobby.action is FlashbackSiteContent.NavAction.ToggleLobbyMusic)
         val board = FlashbackSiteContent.drawerItems().first { it.id == "board" }
-        assertEquals("Report a bug", board.title)
+        assertEquals("Bugs", board.title)
         assertTrue(board.action is FlashbackSiteContent.NavAction.Board)
+        val updates = FlashbackSiteContent.drawerItems().first { it.id == "updates" }
+        assertEquals("Updates", updates.title)
+        val lab = FlashbackSiteContent.drawerItems().first { it.id == "android-lab" }
+        assertEquals("Lab", lab.title)
         val chat = FlashbackSiteContent.drawerItems().first { it.id == "chat" }
         assertEquals("Chat", chat.title)
         assertTrue(chat.action is FlashbackSiteContent.NavAction.Chat)
