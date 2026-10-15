@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import kotlin.math.abs
 
 /**
@@ -14,6 +15,9 @@ class FlashbackLobbyAudio(
     private val context: Context,
     private val origin: String,
 ) {
+    companion object {
+        private const val TAG = "FlashbackLobby"
+    }
     private val main = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
     private var playlistJson: String? = null
@@ -44,7 +48,12 @@ class FlashbackLobbyAudio(
 
     fun start() {
         Thread {
-            val json = FlashbackLobbyPlaylist.fetchPlaylist(origin) ?: return@Thread
+            val json = FlashbackLobbyPlaylist.fetchPlaylist(origin)
+            if (json == null) {
+                Log.w(TAG, "playlist fetch failed origin=$origin")
+                return@Thread
+            }
+            Log.i(TAG, "playlist loaded bytes=${json.length}")
             main.post {
                 playlistJson = json
                 apply()
@@ -76,8 +85,11 @@ class FlashbackLobbyAudio(
         )
         targetVol = dec.volume
         when (dec.action) {
-            "fadeOut" -> fadeTo(0f, dec.fadeOutMs) {
-                pausePlayer()
+            "fadeOut" -> {
+                Log.i(TAG, "fadeOut theater=$theater enabled=$enabled foreground=$foreground")
+                fadeTo(0f, dec.fadeOutMs) {
+                    pausePlayer()
+                }
             }
             "play" -> {
                 if (dec.tracks.isEmpty()) {
@@ -94,6 +106,7 @@ class FlashbackLobbyAudio(
                         dec.tracks
                     }
                     queueIdx = 0
+                    Log.i(TAG, "play song=$activeSong tracks=${queue.size} season=${dec.season}")
                     playIndex(0, fadeIn = true, fadeInMs = dec.fadeInMs)
                 } else {
                     val p = player
@@ -112,6 +125,7 @@ class FlashbackLobbyAudio(
         if (queue.isEmpty()) return
         queueIdx = ((i % queue.size) + queue.size) % queue.size
         val url = queue[queueIdx]
+        Log.i(TAG, "track[$queueIdx] $url")
         releasePlayerOnly()
         try {
             val mp = MediaPlayer().apply {

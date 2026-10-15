@@ -5,11 +5,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * App-level record of CIDs the user asked to Keep offline (pins).
+ * App-level record of CIDs the user asked to Keep offline (pins / seeds).
  * Kubo pin state is authoritative; this drives UI lists / toggles.
+ *
+ * [seedingEnabled] is a master switch: when false, kept titles stay listed but
+ * the node should not advertise / run for seeding until re-enabled.
  */
 class IpfsOfflineStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     data class Entry(
         val cid: String,
@@ -18,6 +22,12 @@ class IpfsOfflineStore(context: Context) {
         val keptAtMs: Long,
         val bytesHint: Long = 0L,
     )
+
+    fun seedingEnabled(): Boolean = prefs.getBoolean(KEY_SEEDING_ENABLED, true)
+
+    fun setSeedingEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SEEDING_ENABLED, enabled).apply()
+    }
 
     fun isKept(cid: String): Boolean {
         val c = cid.trim()
@@ -73,6 +83,10 @@ class IpfsOfflineStore(context: Context) {
         write(all().filterNot { it.cid == c })
     }
 
+    fun clearAll() {
+        write(emptyList())
+    }
+
     private fun write(entries: List<Entry>) {
         val arr = JSONArray()
         for (e in entries) {
@@ -91,5 +105,6 @@ class IpfsOfflineStore(context: Context) {
     companion object {
         private const val PREFS = "flashback_ipfs_offline"
         private const val KEY = "kept"
+        private const val KEY_SEEDING_ENABLED = "seeding_enabled"
     }
 }

@@ -14,6 +14,7 @@ object FlashbackSiteContent {
         object Library : NavAction()
         data class Markdown(val title: String, val path: String) : NavAction()
         object PlaybackLab : NavAction()
+        object SeedingManage : NavAction()
         object Board : NavAction()
         object Chat : NavAction()
         object CheckUpdates : NavAction()
@@ -44,6 +45,7 @@ object FlashbackSiteContent {
             NavItem("legal", "Legal", NavAction.Markdown("Ownership policy", "content/legal.md")),
             NavItem("terms", "Terms", NavAction.Markdown("Terms", "content/terms.md")),
             NavItem("theme", "Theme: $themeLabel", NavAction.CycleTheaterTheme),
+            NavItem("seeding", "Downloads & seeding", NavAction.SeedingManage),
             NavItem("android-lab", "Android lab", NavAction.PlaybackLab),
             NavItem("updates", "Check for updates", NavAction.CheckUpdates),
         )

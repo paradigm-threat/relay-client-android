@@ -1,6 +1,5 @@
 package com.relay.client
 
-import android.content.Context
 import android.os.Build
 import java.net.HttpURLConnection
 import java.net.URL
@@ -20,10 +19,6 @@ object FlashbackBugReport {
     const val PATH_ROOT = ".relay/comments/by-path/"
     const val MAX_BODY = 30_000
     const val KIND_BUG = "bug"
-
-    private const val PREFS = "flashback-bug-report"
-    private const val KEY_FOOTER_DISMISS_UNTIL = "footerDismissUntilMs"
-    private const val DAY_MS = 24L * 60L * 60L * 1000L
 
     data class DebugSnapshot(
         val versionName: String,
@@ -51,22 +46,6 @@ object FlashbackBugReport {
         data class HttpError(val status: Int, val detail: String) : SubmitResult()
         data class NetworkError(val message: String) : SubmitResult()
         data class ValidationError(val message: String) : SubmitResult()
-    }
-
-    fun shouldShowFooter(context: Context, nowMs: Long = System.currentTimeMillis()): Boolean {
-        val until = context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getLong(KEY_FOOTER_DISMISS_UNTIL, 0L)
-        return nowMs >= until
-    }
-
-    /** Hide the floating footer for ~24h (or until prefs cleared). */
-    fun markFooterDismissed(context: Context, nowMs: Long = System.currentTimeMillis()) {
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putLong(KEY_FOOTER_DISMISS_UNTIL, nowMs + DAY_MS)
-            .apply()
     }
 
     /** Match Rust/JS percent_encoding::NON_ALPHANUMERIC (A-Za-z0-9 only unescaped). */

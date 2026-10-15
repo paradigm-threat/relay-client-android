@@ -82,6 +82,7 @@ class FlashbackNativeShell(
     private var lastPlaybackError: String? = null
     private val theatreBackdrop: View
     private var lobbyAudio: FlashbackLobbyAudio? = null
+    private var nowShowingMarquee: NowShowingMarquee? = null
 
     private var chatListener: FlashbackChatSession.Listener? = null
     private var chatActiveChannel: String = FlashbackChatApi.DEFAULT_CHANNEL
@@ -300,6 +301,8 @@ class FlashbackNativeShell(
         if (currentScreen == "chat" || currentScreen == "chat-notify") {
             detachChatListener()
         }
+        nowShowingMarquee?.stop()
+        nowShowingMarquee = null
         playerView?.releasePlayer()
         playerView = null
         contentHost.removeAllViews()
@@ -450,41 +453,61 @@ class FlashbackNativeShell(
     }
 
     /**
-     * Horizontal poster strip — Right wraps last→first (web-style loop for more titles).
-     * Left from the first card leaves the strip (menu / Hide Menu), no wrap-around.
+     * Horizontal poster strip with continuous slow auto-scroll (marquee loop).
+     *
+     * Cards are laid out twice ([A B C][A B C]); scroll resets at the halfway
+     * mark so the strip loops forever — same pattern as the web LCD marquee.
+     * DPAD focus only chains within the first copy. Touch / focus pauses autoplay.
      */
     private fun nowShowingRow(items: List<FlashbackProject>): View {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(4), 0, dp(8))
         }
-        val cards = ArrayList<View>(items.size)
+        // First copy — focusable / keyboard-nav.
+        val focusCards = ArrayList<View>(items.size)
         for (p in items) {
             val card = nowShowingCard(p).also { it.id = View.generateViewId() }
-            cards.add(card)
+            focusCards.add(card)
             row.addView(card)
         }
-        if (cards.size > 1) {
-            for (i in cards.indices) {
-                // Right always loops; Left only chains within the strip (not first→last).
-                cards[i].nextFocusRightId = cards[(i + 1) % cards.size].id
+        // Second copy — visual only (seamless marquee). Still tappable.
+        val loop = items.size > 1 &&
+            NowShowingMarquee.animationsEnabled(context.contentResolver)
+        if (loop) {
+            for (p in items) {
+                row.addView(
+                    nowShowingCard(p).apply {
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                        // Keep click; strip DPAD decoration noise.
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    },
+                )
+            }
+        }
+        if (focusCards.size > 1) {
+            for (i in focusCards.indices) {
+                focusCards[i].nextFocusRightId =
+                    focusCards[(i + 1) % focusCards.size].id
                 if (i > 0) {
-                    cards[i].nextFocusLeftId = cards[i - 1].id
+                    focusCards[i].nextFocusLeftId = focusCards[i - 1].id
                 }
             }
         }
-        return object : HorizontalScrollView(context) {
+        val hsv = object : HorizontalScrollView(context) {
             override fun focusSearch(focused: View?, direction: Int): View? {
-                if (focused != null && cards.isNotEmpty()) {
-                    val idx = cards.indexOf(focused)
+                if (focused != null && focusCards.isNotEmpty()) {
+                    val idx = focusCards.indexOf(focused)
                     if (idx >= 0) {
                         when (direction) {
                             View.FOCUS_RIGHT -> {
-                                if (cards.size > 1) return cards[(idx + 1) % cards.size]
+                                if (focusCards.size > 1) {
+                                    return focusCards[(idx + 1) % focusCards.size]
+                                }
                             }
                             View.FOCUS_LEFT -> {
-                                if (idx > 0) return cards[idx - 1]
-                                // First card: defer to system (sidebar / Menu toggle).
+                                if (idx > 0) return focusCards[idx - 1]
                             }
                         }
                     }
@@ -493,23 +516,23 @@ class FlashbackNativeShell(
             }
 
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                if (event.action == KeyEvent.ACTION_DOWN && cards.isNotEmpty()) {
+                if (event.action == KeyEvent.ACTION_DOWN && focusCards.isNotEmpty()) {
                     val focused = findFocus()
-                    val idx = cards.indexOf(focused)
+                    val idx = focusCards.indexOf(focused)
                     if (idx >= 0) {
+                        nowShowingMarquee?.pauseForUser()
                         when (event.keyCode) {
                             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                if (cards.size > 1) {
-                                    cards[(idx + 1) % cards.size].requestFocus()
+                                if (focusCards.size > 1) {
+                                    focusCards[(idx + 1) % focusCards.size].requestFocus()
                                     return true
                                 }
                             }
                             KeyEvent.KEYCODE_DPAD_LEFT -> {
                                 if (idx > 0) {
-                                    cards[idx - 1].requestFocus()
+                                    focusCards[idx - 1].requestFocus()
                                     return true
                                 }
-                                // First card: do not consume — let focus leave leftward.
                             }
                         }
                     }
@@ -525,6 +548,22 @@ class FlashbackNativeShell(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             )
         }
+        if (loop) {
+            nowShowingMarquee?.stop()
+            nowShowingMarquee = NowShowingMarquee(
+                scroll = hsv,
+                firstSetWidthPx = {
+                    // Width of the first copy = half of total content when duplicated.
+                    val w = row.width
+                    if (w > 0) w / 2 else 0
+                },
+                main = main,
+            ).also {
+                it.attachInteractionListeners()
+                hsv.post { it.start() }
+            }
+        }
+        return hsv
     }
 
     /** Large Now Showing posters — most of the viewport on TV, still oversized on phones. */

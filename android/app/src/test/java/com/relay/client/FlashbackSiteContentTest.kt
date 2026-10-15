@@ -21,11 +21,15 @@ class FlashbackSiteContentTest {
                 "legal",
                 "terms",
                 "theme",
+                "seeding",
                 "android-lab",
                 "updates",
             ),
             ids,
         )
+        val seeding = FlashbackSiteContent.drawerItems().first { it.id == "seeding" }
+        assertEquals("Downloads & seeding", seeding.title)
+        assertTrue(seeding.action is FlashbackSiteContent.NavAction.SeedingManage)
         val theme = FlashbackSiteContent.drawerItems().first { it.id == "theme" }
         assertTrue(theme.title.startsWith("Theme:"))
         assertTrue(theme.action is FlashbackSiteContent.NavAction.CycleTheaterTheme)

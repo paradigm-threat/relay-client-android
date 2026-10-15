@@ -3,6 +3,7 @@ package com.relay.client
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -21,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Foreground service hosting embedded Kubo (`libkubo_daemon.so`).
  * Localhost API :[IpfsSession.API_PORT], gateway :[IpfsSession.GATEWAY_PORT].
+ *
+ * Tray notification is shown only while seeding kept titles or actively downloading.
+ * Tap opens [MainActivity] Downloads & seeding panel.
  */
 class IpfsNodeService : Service() {
     private var daemon: Process? = null
@@ -36,8 +40,19 @@ class IpfsNodeService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+            ACTION_REFRESH_NOTIFICATION -> {
+                applyNotificationPolicy()
+                return START_STICKY
+            }
             else -> {
-                ensureForeground()
+                if (!IpfsNetworkState.shouldKeepAlive(this) && !starting.get()) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                // Must call startForeground promptly when started as FGS; demote if idle notify.
+                ensureChannel()
+                applyNotificationPolicy(forceForegroundBriefly = true)
                 if (IpfsSession.isReady() && daemon?.isAlive == true) {
                     return START_STICKY
                 }
@@ -52,25 +67,66 @@ class IpfsNodeService : Service() {
         super.onDestroy()
     }
 
-    private fun ensureForeground() {
-        val channelId = "flashback-ipfs"
-        if (Build.VERSION.SDK_INT >= 26) {
-            val mgr = getSystemService(NotificationManager::class.java)
-            mgr.createNotificationChannel(
-                NotificationChannel(channelId, "Flashback IPFS", NotificationManager.IMPORTANCE_LOW),
-            )
-        }
-        val note =
+    private fun ensureChannel() {
+        if (Build.VERSION.SDK_INT < 26) return
+        val mgr = getSystemService(NotificationManager::class.java)
+        mgr.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Flashback IPFS", NotificationManager.IMPORTANCE_LOW),
+        )
+    }
+
+    private fun managePendingIntent(): PendingIntent {
+        val open =
+            Intent(this, MainActivity::class.java).apply {
+                action = ACTION_OPEN_SEEDING
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_OPEN_SEEDING, true)
+            }
+        val flags =
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+        return PendingIntent.getActivity(this, 72, open, flags)
+    }
+
+    private fun buildNotification(): Notification {
+        val text = IpfsNetworkState.notificationText(this)
+        val builder =
             if (Build.VERSION.SDK_INT >= 26) {
-                Notification.Builder(this, channelId)
+                Notification.Builder(this, CHANNEL_ID)
             } else {
                 @Suppress("DEPRECATION")
                 Notification.Builder(this)
-            }.setContentTitle("Flashback IPFS")
-                .setContentText("Seeding / fetching on the network")
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .build()
-        startForeground(72, note)
+            }
+        return builder
+            .setContentTitle("Flashback IPFS")
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentIntent(managePendingIntent())
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+    }
+
+    /**
+     * Show FGS notification only when seeding or downloading; otherwise demote to silent
+     * background service (daemon may still run for theater playback hold).
+     */
+    private fun applyNotificationPolicy(forceForegroundBriefly: Boolean = false) {
+        ensureChannel()
+        val notify = IpfsNetworkState.shouldNotify(this)
+        if (notify || forceForegroundBriefly) {
+            startForeground(NOTIF_ID, buildNotification())
+            if (!notify) {
+                // Boot path: satisfy FGS contract, then hide tray if nothing to seed/download.
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            }
+        } else {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        }
+        if (!IpfsNetworkState.shouldKeepAlive(this) && !starting.get()) {
+            stopDaemon()
+            stopSelf()
+        }
     }
 
     private fun boot() {
@@ -91,12 +147,10 @@ class IpfsNodeService : Service() {
                 runIpfs(bin, env, listOf("init", "--profile=lowpower"), timeoutMs = 120_000)
                 configureRepo(bin, env)
             } else {
-                // Ensure ports stay on our localhost bindings after upgrades.
                 configureRepo(bin, env)
             }
 
             stopDaemonQuiet()
-            // Periodic GC reclaims unpinned ephemeral play blocks (TV storage).
             val pb =
                 ProcessBuilder(bin.absolutePath, "daemon", "--migrate=true", "--enable-gc=true")
                     .directory(repo)
@@ -115,7 +169,6 @@ class IpfsNodeService : Service() {
                     }
                 } catch (_: Exception) {
                 }
-                // Process exited — clear ready so the next startService reboots.
                 if (daemon === proc) {
                     Log.w(TAG, "Kubo daemon exited")
                     IpfsSession.markStopped()
@@ -127,7 +180,7 @@ class IpfsNodeService : Service() {
             if (id != null) {
                 IpfsSession.markReady(id)
                 Log.i(TAG, "Kubo ready id=$id abi=${Build.SUPPORTED_ABIS.firstOrNull()}")
-                // Watchdog: if the process dies while the service is alive, reboot once.
+                applyNotificationPolicy()
                 Thread({
                     try {
                         proc.waitFor()
@@ -136,7 +189,7 @@ class IpfsNodeService : Service() {
                             IpfsSession.markStopped()
                             daemon = null
                             Thread.sleep(1_500)
-                            if (!starting.get()) boot()
+                            if (IpfsNetworkState.shouldKeepAlive(this) && !starting.get()) boot()
                         }
                     } catch (_: Exception) {
                     }
@@ -151,11 +204,11 @@ class IpfsNodeService : Service() {
             stopDaemonQuiet()
         } finally {
             starting.set(false)
+            applyNotificationPolicy()
         }
     }
 
     private fun configureRepo(bin: File, env: Map<String, String>) {
-        // Bind API + gateway to localhost only; tighten connmgr for TV/32-bit.
         runIpfs(
             bin,
             env,
@@ -181,15 +234,12 @@ class IpfsNodeService : Service() {
             ),
             timeoutMs = 30_000,
         )
-        // Prefer HTTP routing when DHT is slow on TV Wi‑Fi (still Bitswap for bytes).
         runIpfs(
             bin,
             env,
             listOf("config", "--json", "Routing.AcceleratedDHTClient", "true"),
             timeoutMs = 30_000,
         )
-        // Soft cap: ephemeral play must not fill the TV. Kept pins still count toward this;
-        // GC only drops unpinned blocks.
         val storageMax = if (isLikely32BitOrTv()) "8GB" else "20GB"
         runIpfs(
             bin,
@@ -232,7 +282,6 @@ class IpfsNodeService : Service() {
                         JSONObject(body).optString("ID")
                     }
                     if (id.isNotBlank()) return id
-                    // Some encodings nest differently
                     return JSONObject(body).optString("ID", "ready")
                 }
             } catch (_: Exception) {
@@ -295,7 +344,12 @@ class IpfsNodeService : Service() {
 
     companion object {
         private const val TAG = "IpfsNodeService"
+        private const val CHANNEL_ID = "flashback-ipfs"
+        private const val NOTIF_ID = 72
         const val ACTION_STOP = "com.relay.client.ipfs.STOP"
+        const val ACTION_REFRESH_NOTIFICATION = "com.relay.client.ipfs.REFRESH_NOTIFICATION"
+        const val ACTION_OPEN_SEEDING = "com.relay.client.ipfs.OPEN_SEEDING"
+        const val EXTRA_OPEN_SEEDING = "open_seeding"
 
         fun start(context: Context) {
             val i = Intent(context, IpfsNodeService::class.java)
@@ -308,6 +362,13 @@ class IpfsNodeService : Service() {
 
         fun stop(context: Context) {
             val i = Intent(context, IpfsNodeService::class.java).setAction(ACTION_STOP)
+            context.startService(i)
+        }
+
+        fun refreshNotification(context: Context) {
+            val i =
+                Intent(context, IpfsNodeService::class.java)
+                    .setAction(ACTION_REFRESH_NOTIFICATION)
             context.startService(i)
         }
     }
