@@ -1,5 +1,6 @@
 package com.relay.client
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
@@ -22,14 +23,39 @@ class MainActivity : AppCompatActivity() {
             }
             flashbackShell = shell
             setContentView(shell)
+            maybeOpenSeeding(intent)
             return
         }
         setContentView(RelayClientShell(this))
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        maybeOpenSeeding(intent)
+    }
+
+    private fun maybeOpenSeeding(intent: Intent?) {
+        if (intent?.getBooleanExtra(IpfsNodeService.EXTRA_OPEN_SEEDING, false) == true ||
+            intent?.action == IpfsNodeService.ACTION_OPEN_SEEDING
+        ) {
+            flashbackShell?.openSeedingManage()
+        }
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         flashbackShell?.onConfigurationChanged()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        flashbackShell?.onHostResume()
+    }
+
+    override fun onPause() {
+        flashbackShell?.onHostPause()
+        super.onPause()
     }
 
     @Deprecated("Deprecated in Java")

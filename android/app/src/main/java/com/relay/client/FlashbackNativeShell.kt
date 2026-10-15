@@ -80,9 +80,8 @@ class FlashbackNativeShell(
     private var bannerDismissedThisSession: Boolean = false
     private var currentScreen: String = "library"
     private var lastPlaybackError: String? = null
-    private var bugFooterDismissedThisSession: Boolean = false
-    private val bugFooter: View
     private val theatreBackdrop: View
+    private var lobbyAudio: FlashbackLobbyAudio? = null
 
     private var chatListener: FlashbackChatSession.Listener? = null
     private var chatActiveChannel: String = FlashbackChatApi.DEFAULT_CHANNEL
@@ -179,22 +178,10 @@ class FlashbackNativeShell(
             addView(dl)
         }
 
-        bugFooter = buildBugReportFooter()
-        addView(
-            bugFooter,
-            LayoutParams(
-                LayoutParams.MATCH_PARENT,
-                LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM,
-            ),
-        )
-
-        refreshBugFooterVisibility()
         showLoading("Loading library…")
-        // Warm Kubo when the user already has Keep-offline pins (or always start in background
-        // after catalog load so first Play is faster).
-        if (IpfsOfflineStore(context).all().isNotEmpty()) {
-            IpfsSession.startService(context)
+        // Only warm Kubo when seeding kept titles (master switch on) — no tray spam on every launch.
+        if (IpfsNetworkState.shouldKeepAlive(context)) {
+            IpfsNetworkState.reconcile(context)
         }
         Thread {
             try {
@@ -203,7 +190,9 @@ class FlashbackNativeShell(
                     applyLibrary(library)
                     showLibrary()
                     maybeCheckForUpdates(silent = true)
-                    IpfsSession.startService(context)
+                    if (IpfsNetworkState.shouldKeepAlive(context)) {
+                        IpfsNetworkState.reconcile(context)
+                    }
                 }
             } catch (e: Exception) {
                 main.post {
@@ -233,7 +222,7 @@ class FlashbackNativeShell(
                 showLibrary()
                 true
             }
-            "markdown", "lab", "bug-report", "chat-notify" -> {
+            "markdown", "lab", "seeding", "bug-report", "chat-notify" -> {
                 if (currentScreen == "chat-notify") {
                     showChat(chatActiveChannel)
                 } else {
@@ -261,12 +250,14 @@ class FlashbackNativeShell(
 
     /** Same path as theater Back chip and system Back from theater. */
     private fun leaveTheater() {
+        IpfsNetworkState.setPlaybackHold(false)
         // Reclaim unpinned ephemeral blocks if the on-device repo is over budget.
         Thread {
             try {
                 IpfsSession.maybeGcIfOverBudget(context)
             } catch (_: Exception) {
             }
+            IpfsNetworkState.reconcile(context)
         }.start()
         val p = selected
         if (p != null) showTitle(p) else showLibrary()
@@ -280,6 +271,25 @@ class FlashbackNativeShell(
     private fun applyLibrary(library: FlashbackLibrary) {
         projects = library.projects
         nowShowingSlugs = library.nowShowingSlugs
+        ensureLobbyAudio()
+    }
+
+    private fun ensureLobbyAudio() {
+        if (lobbyAudio != null) return
+        lobbyAudio = FlashbackLobbyAudio(context.applicationContext, origin).also { it.start() }
+        syncLobbyTheater()
+    }
+
+    fun onHostResume() {
+        lobbyAudio?.onForeground(true)
+    }
+
+    fun onHostPause() {
+        lobbyAudio?.onForeground(false)
+    }
+
+    private fun syncLobbyTheater() {
+        lobbyAudio?.setTheater(inTheater)
     }
 
     fun onConfigurationChanged() {
@@ -296,6 +306,7 @@ class FlashbackNativeShell(
         inTheater = false
         theatreBackdrop.visibility = View.VISIBLE
         setDrawerEnabled(true)
+        syncLobbyTheater()
     }
 
     private fun setDrawerEnabled(enabled: Boolean) {
@@ -401,7 +412,6 @@ class FlashbackNativeShell(
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
         selected = null
-        refreshBugFooterVisibility()
         val col = column()
         // Brand lives in the header (topBar). App / Setup / Legal / Why / Request are in the menu.
         // First content matches the website: Now showing, then the rest of the library.
@@ -517,15 +527,34 @@ class FlashbackNativeShell(
         }
     }
 
+    /** Large Now Showing posters — most of the viewport on TV, still oversized on phones. */
+    private fun nowShowingPosterSize(): Pair<Int, Int> {
+        val dm = resources.displayMetrics
+        val screenH = dm.heightPixels
+        val screenW = dm.widthPixels
+        // Leave room for section title + one title line; posters dominate the first viewport.
+        val posterH =
+            if (wideLayout) {
+                (screenH * 0.72f).toInt().coerceIn(dp(280), screenH - dp(120))
+            } else {
+                (screenH * 0.48f).toInt().coerceIn(dp(200), screenH - dp(160))
+            }
+        var posterW = (posterH * 2f / 3f).toInt()
+        val maxW = (screenW * if (wideLayout) 0.42f else 0.55f).toInt()
+        if (posterW > maxW) {
+            posterW = maxW
+        }
+        return posterW to (posterW * 3f / 2f).toInt()
+    }
+
     private fun nowShowingCard(p: FlashbackProject): View {
-        val cardW = dp(120)
-        val posterH = dp(180)
+        val (cardW, posterH) = nowShowingPosterSize()
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(cardW, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                marginEnd = dp(12)
+                marginEnd = dp(16)
             }
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setPadding(dp(2), dp(2), dp(2), dp(2))
             setOnClickListener { showTitle(p) }
             FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, p.title)
             val poster = ImageView(context).apply {
@@ -540,10 +569,10 @@ class FlashbackNativeShell(
                 TextView(context).apply {
                     text = p.title
                     setTextColor(gold)
-                    textSize = 13f
+                    textSize = if (wideLayout) 16f else 14f
                     typeface = Typeface.SERIF
-                    maxLines = 3
-                    setPadding(0, dp(6), 0, 0)
+                    maxLines = 2
+                    setPadding(0, dp(8), 0, 0)
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 },
             )
@@ -610,6 +639,7 @@ class FlashbackNativeShell(
             is FlashbackSiteContent.NavAction.Markdown ->
                 showMarkdownDoc(action.title, action.path)
             is FlashbackSiteContent.NavAction.PlaybackLab -> showPlaybackLab()
+            is FlashbackSiteContent.NavAction.SeedingManage -> showSeedingManage()
             is FlashbackSiteContent.NavAction.Board -> showBugReportForm()
             is FlashbackSiteContent.NavAction.Chat -> showChat(null)
             is FlashbackSiteContent.NavAction.CheckUpdates -> maybeCheckForUpdates(silent = false)
@@ -645,6 +675,11 @@ class FlashbackNativeShell(
     /** Open native IRC chat (notification deep-link / menu). */
     fun openChat(channel: String?) {
         showChat(channel)
+    }
+
+    /** Notification tray / deep-link → Downloads & seeding manage panel. */
+    fun openSeedingManage() {
+        showSeedingManage()
     }
 
     private fun topBar(): LinearLayout {
@@ -843,7 +878,6 @@ class FlashbackNativeShell(
         currentScreen = "title"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
-        refreshBugFooterVisibility()
 
         val movieAck = FlashbackOwnership.hasAck(context, FlashbackOwnership.movieKey(p.slug))
         // Stream ladder only for Now showing (bytes on this server). Others: IPFS download.
@@ -874,8 +908,9 @@ class FlashbackNativeShell(
 
         val posterUrl = p.posterUrl(origin)
         if (!posterUrl.isNullOrBlank()) {
+            val (pw, ph) = nowShowingPosterSize()
             val poster = ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(200), dp(300)).apply {
+                layoutParams = LinearLayout.LayoutParams(pw, ph).apply {
                     bottomMargin = dp(12)
                 }
                 scaleType = ImageView.ScaleType.CENTER_CROP
@@ -1088,15 +1123,16 @@ class FlashbackNativeShell(
         if (inCatalog) {
             host.addView(
                 body(
-                    "Keep pins this title in the on-device Kubo node (Bitswap). " +
+                    "Seed / keep pins this title in the on-device Kubo node (Bitswap). " +
+                        "When checked, Flashback shares it on the network. " +
                         "Play can stream from the local gateway while blocks download.",
                 ),
             )
             val store = IpfsOfflineStore(context)
             val keepBox =
                 CheckBox(context).apply {
-                    text = "Keep offline copy"
-                    isChecked = store.isKept(keepCid)
+                    text = "Seed / keep offline"
+                    isChecked = store.isKept(keepCid) && store.seedingEnabled()
                     setTextColor(cream)
                     textSize = 15f
                     FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, text.toString())
@@ -1106,37 +1142,53 @@ class FlashbackNativeShell(
                         Thread {
                             val ok =
                                 try {
-                                    if (!IpfsSession.ensureStartedAndReady(context, 120_000L)) {
-                                        false
-                                    } else if (checked) {
-                                        IpfsSession.ensureFetching(keepCid)
-                                        val pinned = IpfsSession.pinAdd(keepCid)
-                                        if (pinned) {
-                                            store.keep(keepCid, p.title, p.slug)
+                                    if (checked) {
+                                        store.setSeedingEnabled(true)
+                                        IpfsNetworkState.beginPinJob()
+                                        IpfsNetworkState.reconcile(context)
+                                        try {
+                                            if (!IpfsSession.ensureStartedAndReady(context, 120_000L)) {
+                                                false
+                                            } else {
+                                                IpfsSession.ensureFetching(keepCid)
+                                                val pinned = IpfsSession.pinAdd(keepCid)
+                                                if (pinned) {
+                                                    store.keep(keepCid, p.title, p.slug)
+                                                }
+                                                pinned
+                                            }
+                                        } finally {
+                                            IpfsNetworkState.endPinJob()
+                                            IpfsNetworkState.reconcile(context)
                                         }
-                                        pinned
                                     } else {
-                                        IpfsSession.pinRm(keepCid)
+                                        if (IpfsSession.isReady() ||
+                                            IpfsSession.ensureStartedAndReady(context, 60_000L)
+                                        ) {
+                                            IpfsSession.pinRm(keepCid)
+                                            IpfsSession.repoGc()
+                                        }
                                         store.remove(keepCid)
-                                        IpfsSession.repoGc()
+                                        IpfsNetworkState.reconcile(context)
                                         true
                                     }
                                 } catch (_: Exception) {
+                                    IpfsNetworkState.reconcile(context)
                                     false
                                 }
                             main.post {
                                 isEnabled = true
                                 if (!ok) {
-                                    isChecked = store.isKept(keepCid)
+                                    isChecked = store.isKept(keepCid) && store.seedingEnabled()
                                     Toast.makeText(
                                         context,
-                                        IpfsSession.lastError().ifBlank { "IPFS keep failed" },
+                                        IpfsSession.lastError().ifBlank { "IPFS seed failed" },
                                         Toast.LENGTH_LONG,
                                     ).show()
                                 } else {
                                     Toast.makeText(
                                         context,
-                                        if (checked) "Kept offline (pinned)" else "Offline copy removed",
+                                        if (checked) "Seeding offline (pinned)" else "Seed removed",
                                         Toast.LENGTH_SHORT,
                                     ).show()
                                 }
@@ -1244,11 +1296,11 @@ class FlashbackNativeShell(
     ) {
         clear()
         inTheater = true
+        syncLobbyTheater()
         selected = p
         currentScreen = "theater"
         theatreBackdrop.visibility = View.GONE
         setDrawerEnabled(false)
-        refreshBugFooterVisibility()
         // Lock landscape before attaching the player so the first bind is not torn down mid-prepare.
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         enterImmersive()
@@ -1434,9 +1486,13 @@ class FlashbackNativeShell(
             }
             ipfsStatus.visibility = View.VISIBLE
             ipfsStatus.text = "Starting IPFS (${IpfsSession.abiLabel()})…"
+            IpfsNetworkState.setPlaybackHold(true)
+            IpfsNetworkState.reconcile(context)
             Thread {
                 val ready = IpfsSession.ensureStartedAndReady(context, 120_000L)
                 if (!ready) {
+                    IpfsNetworkState.setPlaybackHold(false)
+                    IpfsNetworkState.reconcile(context)
                     main.post {
                         ipfsStatus.text =
                             "IPFS unavailable: ${IpfsSession.lastError().ifBlank { "node failed" }}"
@@ -1448,7 +1504,11 @@ class FlashbackNativeShell(
                 IpfsSession.ensureFetching(cid)
                 val local = FlashbackStreamLadder.resolveLocalPlayUrl(opt)
                 main.post {
-                    if (player.released) return@post
+                    if (player.released) {
+                        IpfsNetworkState.setPlaybackHold(false)
+                        IpfsNetworkState.reconcile(context)
+                        return@post
+                    }
                     if (local.isNullOrBlank()) {
                         ipfsStatus.text = "IPFS ready but play URL missing"
                         player.showSimulatedError(PlaybackErrors.Kind.NETWORK)
@@ -1471,6 +1531,133 @@ class FlashbackNativeShell(
     }
 
     /**
+     * Quick controls from the IPFS / download notification: pause all seeding,
+     * re-enable seeds, cancel file downloads.
+     */
+    private fun showSeedingManage() {
+        clear()
+        currentScreen = "seeding"
+        activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        setDrawerEnabled(true)
+        val col = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(28))
+        }
+        val back = TextView(context).apply {
+            text = "← Back"
+            setTextColor(gold)
+            textSize = 16f
+            FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, "Back")
+            setOnClickListener { leaveOverlay() }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(12) }
+        }
+        col.addView(back)
+        col.addView(sectionTitle("Downloads & seeding"))
+        col.addView(
+            body(
+                "Tray notification appears only while seeding kept titles or an active download. " +
+                    "Tap the notification anytime to return here.",
+            ),
+        )
+        val store = IpfsOfflineStore(context)
+        val status = body(
+            "Master seeding: ${if (store.seedingEnabled()) "ON" else "OFF"}\n" +
+                "Kept titles: ${store.all().size}\n" +
+                "Active downloads: ${IpfsNetworkState.activeDownloadCount()}\n" +
+                "Pin jobs: ${IpfsNetworkState.activePinJobCount()}\n" +
+                "IPFS ready: ${IpfsSession.isReady()} · peers: ${IpfsSession.peerCount()}\n" +
+                "Notification: ${if (IpfsNetworkState.shouldNotify(context)) IpfsNetworkState.notificationText(context) else "hidden"}",
+        )
+        col.addView(status)
+
+        fun refreshStatus() {
+            val s = IpfsOfflineStore(context)
+            status.text =
+                "Master seeding: ${if (s.seedingEnabled()) "ON" else "OFF"}\n" +
+                    "Kept titles: ${s.all().size}\n" +
+                    "Active downloads: ${IpfsNetworkState.activeDownloadCount()}\n" +
+                    "Pin jobs: ${IpfsNetworkState.activePinJobCount()}\n" +
+                    "IPFS ready: ${IpfsSession.isReady()} · peers: ${IpfsSession.peerCount()}\n" +
+                    "Notification: ${if (IpfsNetworkState.shouldNotify(context)) IpfsNetworkState.notificationText(context) else "hidden"}"
+        }
+
+        col.addView(
+            primaryButton("Disable all seeding") {
+                status.text = "Disabling seeding…"
+                Thread {
+                    IpfsSeedingActions.disableAllSeeding(context)
+                    main.post {
+                        refreshStatus()
+                        Toast.makeText(context, "Seeding disabled", Toast.LENGTH_SHORT).show()
+                    }
+                }.start()
+            },
+        )
+        col.addView(
+            primaryButton("Enable all seeding") {
+                status.text = "Enabling / re-pinning…"
+                Thread {
+                    IpfsSeedingActions.enableAllSeeding(context)
+                    main.post {
+                        refreshStatus()
+                        Toast.makeText(context, "Seeding enabled", Toast.LENGTH_SHORT).show()
+                    }
+                }.start()
+            },
+        )
+        col.addView(
+            secondaryButton("Cancel all downloads") {
+                IpfsSeedingActions.cancelAllDownloads(context)
+                refreshStatus()
+                Toast.makeText(context, "Cancel requested", Toast.LENGTH_SHORT).show()
+            },
+        )
+        col.addView(
+            secondaryButton("Remove all offline titles") {
+                AlertDialog.Builder(context)
+                    .setTitle("Remove all offline?")
+                    .setMessage("Unpins and clears every kept title. Files already saved separately are not deleted.")
+                    .setPositiveButton("Remove all") { _, _ ->
+                        status.text = "Removing…"
+                        Thread {
+                            IpfsSeedingActions.removeAllOffline(context)
+                            main.post {
+                                refreshStatus()
+                                Toast.makeText(context, "Offline list cleared", Toast.LENGTH_SHORT).show()
+                            }
+                        }.start()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            },
+        )
+        col.addView(
+            secondaryButton("Stop IPFS node now") {
+                IpfsNetworkState.setPlaybackHold(false)
+                IpfsNodeService.stop(context)
+                refreshStatus()
+                Toast.makeText(context, "IPFS stop requested", Toast.LENGTH_SHORT).show()
+            },
+        )
+
+        val kept = store.all()
+        col.addView(sectionTitle("Kept titles"))
+        if (kept.isEmpty()) {
+            col.addView(body("None yet — use Seed / keep offline on a title."))
+        } else {
+            for (e in kept) {
+                col.addView(
+                    body("• ${e.title.ifBlank { e.cid.take(18) }}"),
+                )
+            }
+        }
+        wrapScroll(col, back)
+    }
+
+    /**
      * Device / error-overlay sandbox for APK compatibility checks (also documented at /android-lab).
      */
     private fun showPlaybackLab() {
@@ -1478,7 +1665,6 @@ class FlashbackNativeShell(
         currentScreen = "lab"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
-        refreshBugFooterVisibility()
         val report = HevcCapability.probe()
         val col = column()
         val backLab = TextView(context).apply {
@@ -1622,8 +1808,14 @@ class FlashbackNativeShell(
         )
         col.addView(
             secondaryButton("Stop IPFS node") {
+                IpfsNetworkState.setPlaybackHold(false)
                 IpfsNodeService.stop(context)
                 ipfsInfo.text = "IPFS stop requested"
+            },
+        )
+        col.addView(
+            secondaryButton("Downloads & seeding…") {
+                showSeedingManage()
             },
         )
         val kept = IpfsOfflineStore(context).all()
@@ -1714,7 +1906,6 @@ class FlashbackNativeShell(
         currentScreen = "markdown"
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
-        refreshBugFooterVisibility()
         val col = column()
         val backMd = TextView(context).apply {
             text = "← Back"
@@ -1761,50 +1952,6 @@ class FlashbackNativeShell(
         }
     }
 
-    private fun buildBugReportFooter(): View {
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#2a1018"))
-            setPadding(dp(14), dp(12), dp(10), dp(12))
-            elevation = dp(8).toFloat()
-            addView(
-                TextView(context).apply {
-                    text = "Submit a bug report"
-                    setTextColor(gold)
-                    textSize = 15f
-                    typeface = Typeface.DEFAULT_BOLD
-                    setOnClickListener { showBugReportForm() }
-                    FlashbackFocus.decorate(this, FlashbackFocus.Style.ROW, "Submit a bug report")
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                },
-            )
-            addView(
-                TextView(context).apply {
-                    text = "✕"
-                    setTextColor(creamMuted)
-                    textSize = 18f
-                    setPadding(dp(12), dp(4), dp(8), dp(4))
-                    setOnClickListener {
-                        bugFooterDismissedThisSession = true
-                        FlashbackBugReport.markFooterDismissed(context)
-                        refreshBugFooterVisibility()
-                    }
-                    FlashbackFocus.decorate(this, FlashbackFocus.Style.CHIP, "Dismiss bug report bar")
-                },
-            )
-        }
-    }
-
-    private fun refreshBugFooterVisibility() {
-        val show = !inTheater &&
-            currentScreen != "bug-report" &&
-            currentScreen != "chat" &&
-            currentScreen != "chat-notify" &&
-            !bugFooterDismissedThisSession &&
-            FlashbackBugReport.shouldShowFooter(context)
-        bugFooter.visibility = if (show) View.VISIBLE else View.GONE
-    }
 
     private fun detachChatListener() {
         val session = FlashbackChatSession.peek()
@@ -1836,7 +1983,6 @@ class FlashbackNativeShell(
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
         setDrawerEnabled(true)
-        refreshBugFooterVisibility()
         FlashbackChatNotifier.ensureChannel(context)
         ensureNotificationPermission()
 
@@ -2086,7 +2232,6 @@ class FlashbackNativeShell(
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
         setDrawerEnabled(true)
-        refreshBugFooterVisibility()
         ensureNotificationPermission()
         FlashbackChatNotifier.ensureChannel(context)
 
@@ -2209,7 +2354,6 @@ class FlashbackNativeShell(
         activity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         exitImmersive()
         setDrawerEnabled(true)
-        refreshBugFooterVisibility()
 
         val col = column()
         val backBug = TextView(context).apply {
@@ -2546,8 +2690,7 @@ class FlashbackNativeShell(
                 },
             )
         }
-        // Extra bottom pad so the floating bug-report footer does not cover the last controls.
-        col.setPadding(dp(18), dp(4), dp(18), dp(72))
+        col.setPadding(dp(18), dp(4), dp(18), dp(24))
         contentHost.addView(root)
         FlashbackFocus.seedFocus(preferredFocus)
     }
