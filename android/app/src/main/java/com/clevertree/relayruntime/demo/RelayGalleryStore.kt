@@ -85,6 +85,24 @@ object RelayGalleryStore {
         if (img.highResSrc.isNotEmpty()) img.highResSrc else img.src
 
     /**
+     * Soft-retry image into [view] (transient tip/IPFS 404s). Same schedule as the lightbox.
+     */
+    fun bindImage(view: ImageView, src: String, maxAttempts: Int = 6) {
+        if (src.isBlank()) return
+        loadWithRetry(view, src, maxAttempts)
+    }
+
+    /**
+     * Open the fullscreen lightbox for a single image (registers if needed).
+     */
+    fun openLightbox(context: Context, src: String, alt: String = "") {
+        if (src.isBlank()) return
+        register(src, alt)
+        openAt(src)
+        presentIfOpen(context)
+    }
+
+    /**
      * Show fullscreen-ish dialog for the current gallery item (soft-retry image load).
      */
     fun presentIfOpen(context: Context) {

@@ -98,13 +98,38 @@ data class FlashbackLibrary(
 )
 
 object FlashbackCatalog {
+    /**
+     * Full catalog: [index.json] plus optional CID merge from [assets.manifest.json].
+     * Prefer [fetchIndex] + [enrichWithManifest] so the UI can paint before the manifest.
+     */
     fun fetch(origin: String): FlashbackLibrary {
+        val library = fetchIndex(origin)
+        return enrichWithManifest(origin, library)
+    }
+
+    /** Catalog titles only — required for the library screen. */
+    fun fetchIndex(origin: String): FlashbackLibrary {
         val base = origin.trim().trimEnd('/')
-        val text = httpGet("$base/index.json") ?: throw IllegalStateException("Could not load library")
-        val library = parseIndexJson(text)
-        val manifestText = httpGet("$base/assets.manifest.json")
+        val text = httpGet("$base/index.json")
+            ?: throw IllegalStateException("Could not load library")
+        return parseIndexJson(text)
+    }
+
+    /**
+     * Merge IPFS CIDs from `assets.manifest.json`. Returns [library] unchanged on
+     * timeout/miss so a slow tip does not block first paint.
+     */
+    fun enrichWithManifest(origin: String, library: FlashbackLibrary): FlashbackLibrary {
+        val base = origin.trim().trimEnd('/')
+        val manifestText = httpGet(
+            "$base/assets.manifest.json",
+            connectTimeoutMs = 8_000,
+            readTimeoutMs = 15_000,
+            attempts = 2,
+        )
         val cidByPath = parseAssetsManifestCids(manifestText)
         if (cidByPath.isEmpty()) return library
+        var changed = false
         val merged = library.projects.map { p ->
             fun cidFor(file: String): String {
                 if (file.isBlank()) return ""
@@ -117,10 +142,11 @@ object FlashbackCatalog {
             if (masterCid == p.ipfsCid && webCid == p.ipfsCidWeb && mobileCid == p.ipfsCidMobile) {
                 p
             } else {
+                changed = true
                 p.copy(ipfsCid = masterCid, ipfsCidWeb = webCid, ipfsCidMobile = mobileCid)
             }
         }
-        return library.copy(projects = merged)
+        return if (changed) library.copy(projects = merged) else library
     }
 
     /** Tip path or `/ipfs/{cid}` for a catalog media filename. */
@@ -308,19 +334,42 @@ object FlashbackCatalog {
             ch == ',' || ch == ';' || ch == '=' || ch == ':' || ch == '@'
     }
 
-    fun httpGet(url: String): String? {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.requestMethod = "GET"
-        conn.connectTimeout = 20_000
-        conn.readTimeout = 30_000
-        conn.instanceFollowRedirects = true
-        return try {
-            if (conn.responseCode !in 200..299) null
-            else conn.inputStream.bufferedReader().readText()
-        } catch (_: Exception) {
-            null
-        } finally {
-            conn.disconnect()
+    /**
+     * GET with short connect timeout and a few attempts so a dead peer fails
+     * in ~tens of seconds instead of hanging the library spinner for a minute+.
+     */
+    fun httpGet(
+        url: String,
+        connectTimeoutMs: Int = 10_000,
+        readTimeoutMs: Int = 25_000,
+        attempts: Int = 3,
+    ): String? {
+        repeat(attempts.coerceAtLeast(1)) { attempt ->
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = connectTimeoutMs
+            conn.readTimeout = readTimeoutMs
+            conn.instanceFollowRedirects = true
+            try {
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    return conn.inputStream.bufferedReader().readText()
+                }
+                // Retry transient edge/gateway errors; treat 404 as final miss.
+                if (code == 404 || code == 410) return null
+            } catch (_: Exception) {
+                // try again below
+            } finally {
+                conn.disconnect()
+            }
+            if (attempt < attempts - 1) {
+                try {
+                    Thread.sleep(300L * (attempt + 1))
+                } catch (_: InterruptedException) {
+                    return null
+                }
+            }
         }
+        return null
     }
 }

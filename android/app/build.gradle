@@ -37,8 +37,8 @@ android {
         // targetSdk 33: fine for sideload; raising alone does not silence Play Protect.
         // Keep minSdk 24 for older phones / Android TV leanback installs.
         targetSdk 33
-        versionCode 53
-        versionName "1.0.53"
+        versionCode 60
+        versionName "1.0.60"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 

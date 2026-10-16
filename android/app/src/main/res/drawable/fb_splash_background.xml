@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cold-start / Android splash: HD wordmark on theater black. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0D0505" />
+        </shape>
+    </item>
+    <item
+        android:left="36dp"
+        android:right="36dp"
+        android:top="0dp"
+        android:bottom="0dp">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/fb_logo_splash" />
+    </item>
+</layer-list>
